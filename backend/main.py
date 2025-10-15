@@ -15,6 +15,15 @@ import tempfile
 import json
 import cloudinary
 import cloudinary.uploader
+#import google.generativeai as genai
+from openai import OpenAI
+import base64
+from PIL import Image, ImageFilter  # used by sharpening step
+from typing import List, Tuple
+from google.cloud import documentai_v1 as documentai
+from google.oauth2 import service_account
+from googleapiclient.discovery import build
+import datetime
 
 
 # Configure logging
@@ -28,7 +37,7 @@ print("🚀 Server has started and main.py is loaded")
 # Configure CORS - explicitly allow your GitHub Pages d
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://veenu-wootz.github.io", "http://localhost:3000"],
+    allow_origins=["https://veenu-wootz.github.io", "http://localhost:3000", "https://aniketsandhanwootz-wq.github.io"],
     allow_credentials=True,
     allow_methods=["GET", "POST", "HEAD", "OPTIONS"],
     allow_headers=["*"],
@@ -40,6 +49,51 @@ DET_MODEL_DIR = os.path.join(PADDLE_HOME, "whl/det/en/en_PP-OCRv3_det_infer")
 REC_MODEL_DIR = os.path.join(PADDLE_HOME, "whl/rec/en/en_PP-OCRv3_rec_infer")
 CLS_MODEL_DIR = os.path.join(PADDLE_HOME, "whl/cls/ch_ppocr_mobile_v2.0_cls_infer")
 
+# Gemini API Configuration
+#GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+#if GEMINI_API_KEY:
+#    genai.configure(api_key=GEMINI_API_KEY)
+#    logger.info("✅ Gemini API configured")
+
+#Open AI API Configuration
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+openai_client = OpenAI(api_key=OPENAI_API_KEY) if OPENAI_API_KEY else None
+
+# --- Google DocAI config (kept out of GitHub) ---
+if os.getenv("GOOGLE_APPLICATION_CREDENTIALS_JSON"):
+    _sa_path = "/tmp/gcp_sa.json"
+    if not os.path.exists(_sa_path):
+        with open(_sa_path, "w") as f:
+            f.write(os.environ["GOOGLE_APPLICATION_CREDENTIALS_JSON"])
+    os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = _sa_path
+
+DOC_PROJECT_ID = os.getenv("GCP_PROJECT_ID")
+DOC_LOCATION   = os.getenv("GCP_LOCATION", "us")
+DOC_PROCESSOR  = os.getenv("DOC_PROCESSOR_ID")
+
+# ---- Google Sheets config (service account) ----
+SHEET_ID  = os.getenv("SHEET_ID")
+SHEET_TAB = os.getenv("SHEET_TAB", "Logs")
+_SHEETS_SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
+_sheets_service = None
+
+def _get_sheets_service():
+    """Create and cache a Sheets API client using the same SA file we wrote to /tmp."""
+    global _sheets_service
+    if _sheets_service is None:
+        cred_path = os.getenv("GOOGLE_APPLICATION_CREDENTIALS")
+        if not cred_path or not os.path.exists(cred_path):
+            logger.warning("Sheets: no GOOGLE_APPLICATION_CREDENTIALS file found")
+            return None
+        creds = service_account.Credentials.from_service_account_file(
+            cred_path, scopes=_SHEETS_SCOPES
+        )
+        # cache_discovery avoids filesystem writes on serverless
+        _sheets_service = build("sheets", "v4", credentials=creds, cache_discovery=False)
+    return _sheets_service
+
+#else:
+#    logger.warning("⚠️ GEMINI_API_KEY not found - vision OCR will be disabled")
 # Check and log model paths on startup
 @app.on_event("startup")
 async def startup_event():
@@ -47,12 +101,13 @@ async def startup_event():
     logger.info(f"Detection model: {DET_MODEL_DIR} (exists: {os.path.exists(DET_MODEL_DIR)})")
     logger.info(f"Recognition model: {REC_MODEL_DIR} (exists: {os.path.exists(REC_MODEL_DIR)})")
     logger.info(f"Classification model: {CLS_MODEL_DIR} (exists: {os.path.exists(CLS_MODEL_DIR)})")
+    logger.info(f"Sheets configured: {bool(SHEET_ID)}; DocAI configured: {bool(DOC_PROCESSOR)}")
 
 # Code look for an “O” preceded by whitespace and followed by a digit and replaces it with “Ø”
 def fix_diameter(text: str) -> str:
     # look for an “O” preceded by whitespace and followed by a digit,
     # and replace it with “Ø”
-    return re.sub(r'(?<=\s)O(?=\d)', 'Ø', text)
+    return re.sub(r'(?<=\s)[O0](?=\d)', 'Ø', text)
 
 # Initialize OCR model
 def get_ocr_model():
@@ -66,6 +121,347 @@ def get_ocr_model():
         cls_model_dir=CLS_MODEL_DIR,
         use_gpu=False
     )
+# ====== OUTER-BORDER COMPLETION (no internal lines touched) ======
+# ====== OUTER-BORDER COMPLETION (Advanced v2) ======
+def _binarize(gray):
+    """Convert grayscale to binary (text/lines = white)"""
+    thr = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)[1]
+    return 255 - thr
+
+def _find_internal_horizontals(inv, x_left, x_right, min_len_frac=0.35):
+    """
+    Detect internal horizontal lines within corridor using Hough transform.
+    Uses two-pass approach: strict then relaxed detection.
+    """
+    H, W = inv.shape
+    roi = inv[:, x_left:x_right+1]
+    edges = cv2.Canny(roi, 30, 100, apertureSize=3)
+
+    ys = []
+    # Two-pass detection: strict then relaxed
+    for thr, minFrac, maxGap in [(100, 0.50, 15), (70, min_len_frac, 25)]:
+        min_len = max(12, int((x_right - x_left + 1) * minFrac))
+        lines = cv2.HoughLinesP(edges, 1, np.pi/180, threshold=thr,
+                                minLineLength=min_len, maxLineGap=maxGap)
+        if lines is None:
+            continue
+        for x1, y1, x2, y2 in lines[:, 0]:
+            if abs(y2 - y1) <= 2:  # Horizontal line
+                ys.append(int((y1 + y2) // 2))
+    
+    if not ys:
+        return []
+    
+    # Merge nearby lines
+    ys.sort()
+    merged = []
+    for y in ys:
+        if not merged or abs(y - merged[-1]) > 6:
+            merged.append(y)
+    return merged
+
+def _estimate_corridor_from_text(inv, Y, pad_lr=5):
+    """
+    Estimate left/right corridor boundaries using percentile of text distribution.
+    More robust than simple min/max approach.
+    """
+    H, W = inv.shape
+    if not Y:
+        return pad_lr, W - 1 - pad_lr
+    
+    lefts, rights = [], []
+    for y in Y:
+        y1 = max(0, y - 12)
+        y2 = min(H - 1, y + 12)
+        band = inv[y1:y2, :]
+        cols = (band > 0).sum(axis=0)
+        nz = np.where(cols > 0)[0]
+        if nz.size:
+            lefts.append(nz.min())
+            rights.append(nz.max())
+    
+    if not lefts or not rights:
+        return pad_lr, W - 1 - pad_lr
+    
+    # Use 5th/95th percentile instead of min/max for robustness
+    x_left  = int(np.percentile(lefts,  5)) - pad_lr
+    x_right = int(np.percentile(rights, 95)) + pad_lr
+    return max(0, x_left), min(W - 1, x_right)
+
+def _median_row_gap(Y):
+    """Calculate median gap between consecutive horizontal lines"""
+    if len(Y) < 2:
+        return None
+    gaps = np.diff(sorted(Y))
+    return float(np.median(gaps))
+
+def _snap_to_text_edge(inv, x_left, x_right, search='up', pad=4):
+    """
+    Find y-coordinate just outside first/last ink row within corridor.
+    
+    Args:
+        inv: Binary inverted image
+        x_left, x_right: Corridor boundaries
+        search: 'up' for top edge, 'down' for bottom edge
+        pad: Extra padding pixels
+    """
+    H = inv.shape[0]
+    corr = inv[:, x_left:x_right+1]
+    ink = (corr > 0).sum(axis=1)
+    
+    # Threshold: require ~2% of corridor width to have ink
+    thr = max(3, int(0.02 * (x_right - x_left + 1)))
+    nz = np.where(ink > thr)[0]
+    
+    if nz.size == 0:
+        return 0 if search == 'up' else H - 1
+    
+    if search == 'up':
+        return max(0, nz[0] - pad)
+    else:
+        return min(H - 1, nz[-1] + pad)
+
+def _band_coverage(inv, x_left, x_right, y1, y2):
+    """
+    Calculate ink coverage ratio in a band.
+    Used to validate that new borders contain actual content.
+    """
+    if y2 <= y1:
+        return 0.0
+    band = inv[y1:y2, x_left:x_right+1]
+    total_pixels = band.size
+    ink_pixels = (band > 0).sum()
+    return float(ink_pixels) / float(total_pixels + 1e-6)
+
+# ====== TOP & BOTTOM BORDER ONLY ======
+def add_top_bottom_borders(img_bgr, line_thickness=2):
+    """Add only top and bottom horizontal borders"""
+    H, W = img_bgr.shape[:2]
+    gray = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2GRAY)
+    _, binary = cv2.threshold(gray, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+    inv = 255 - binary
+    
+    # Find vertical projection to detect text boundaries
+    vertical_proj = np.sum(inv, axis=1)
+    threshold = np.max(vertical_proj) * 0.02
+    text_rows = np.where(vertical_proj > threshold)[0]
+    
+    if len(text_rows) > 0:
+        y_top = max(0, text_rows[0] - 4)
+        y_bottom = min(H - 1, text_rows[-1] + 4)
+    else:
+        y_top = 0
+        y_bottom = H - 1
+    
+    # Draw only top and bottom lines
+    out = gray.copy()
+    cv2.line(out, (0, y_top), (W-1, y_top), 0, thickness=line_thickness)
+    cv2.line(out, (0, y_bottom), (W-1, y_bottom), 0, thickness=line_thickness)
+    
+    return cv2.cvtColor(out, cv2.COLOR_GRAY2BGR)
+
+# ====== ROW DETECTOR (Hough) ======
+def detect_cell_borders(img_bgr):
+    H, W = img_bgr.shape[:2]
+    gray = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2GRAY)
+    edges = cv2.Canny(gray, 50, 150, apertureSize=3)
+    lines = cv2.HoughLinesP(edges, 1, np.pi/180, threshold=100,
+                            minLineLength=int(W * 0.5), maxLineGap=7)
+
+    horizontal_lines = []
+    if lines is not None:
+        for line in lines:
+            x1, y1, x2, y2 = line[0]
+            if abs(y2 - y1) < 5:
+                horizontal_lines.append((y1 + y2) // 2)
+
+    horizontal_lines = sorted(set(horizontal_lines))
+    merged_lines = []
+    for y in horizontal_lines:
+        if not merged_lines or abs(y - merged_lines[-1]) > 10:
+            merged_lines.append(y)
+
+    # ---- Add image top and bottom as borders ----
+    # top
+    if not merged_lines or abs(merged_lines[0] - 0) > 10:
+        merged_lines = [0] + merged_lines
+    else:
+        merged_lines[0] = 0
+    # bottom
+    if not merged_lines or abs((H - 1) - merged_lines[-1]) > 10:
+        merged_lines = merged_lines + [H - 1]
+    else:
+        merged_lines[-1] = H - 1
+    # --------------------------------------------
+
+    bands = []
+    for i in range(len(merged_lines) - 1):
+        y1, y2 = merged_lines[i], merged_lines[i + 1]
+        if y2 - y1 > 15:
+            bands.append((y1, y2))
+
+    return bands
+
+# ====== SPACING / UPSCALE / SHARPEN (used only for Quantity) ======
+def add_vertical_spacing(img_bgr, cell_boundaries, spacing_px=25):
+    H, W = img_bgr.shape[:2]
+    new_h = H + len(cell_boundaries)*spacing_px
+    out = np.ones((new_h, W, 3), np.uint8) * 255
+    y = 0
+    new_bounds = []
+    for (y1,y2) in cell_boundaries:
+        h = y2-y1
+        out[y:y+h, :] = img_bgr[y1:y2, :]
+        new_bounds.append((y, y+h))
+        y += h + spacing_px
+    return out, new_bounds
+
+def upscale_image(img, scale_factor=4):
+    h, w = img.shape[:2]
+    return cv2.resize(img, (int(w*scale_factor), int(h*scale_factor)), interpolation=cv2.INTER_CUBIC)
+
+def sharpen_image(img_bgr, strength=1.5):
+    img_rgb = cv2.cvtColor(img_bgr, cv2.COLOR_BGR2RGB)
+    pil = Image.fromarray(img_rgb)
+    sharp = pil.filter(ImageFilter.UnsharpMask(radius=2, percent=int(strength*100), threshold=3))
+    return cv2.cvtColor(np.array(sharp), cv2.COLOR_RGB2BGR)
+
+def _docai_lines(image_bgr):
+    """Run Google Document AI and return [{'text', 'x', 'y', 'confidence'}] in image coords."""
+    if not (DOC_PROJECT_ID and DOC_LOCATION and DOC_PROCESSOR):
+        logger.warning("DocAI env not set; skipping")
+        return []
+    ok, buf = cv2.imencode(".png", image_bgr)
+    if not ok:
+        return []
+    client = documentai.DocumentProcessorServiceClient()
+    name = client.processor_path(DOC_PROJECT_ID, DOC_LOCATION, DOC_PROCESSOR)
+    raw_document = documentai.RawDocument(content=buf.tobytes(), mime_type="image/png")
+    result = client.process_document(request=documentai.ProcessRequest(name=name, raw_document=raw_document))
+
+    H, W = image_bgr.shape[:2]  # ← ADD WIDTH
+    out = []
+    for page in result.document.pages:
+        for line in getattr(page, "lines", []):
+            text = ""
+            for seg in line.layout.text_anchor.text_segments:
+                s = int(seg.start_index) if seg.start_index else 0
+                e = int(seg.end_index) if seg.end_index else 0
+                text += result.document.text[s:e]
+            if not text.strip():
+                continue
+            v = line.layout.bounding_poly.normalized_vertices
+            x = ((v[0].x + v[2].x)/2.0) * W  # ← ADD X COORDINATE
+            y = ((v[0].y + v[2].y)/2.0) * H
+            # ← ADD PHI SYMBOL FIX HERE
+            cleaned_text = fix_diameter(text.strip())
+            out.append({"text": cleaned_text, "x": x, "y": y, "confidence": float(line.layout.confidence or 0.9)})
+    return out
+
+def _map_to_bands(lines, bands, scale=1.0):
+    """Map DocAI lines to (y1,y2) bands. If the image was upscaled, pass scale (e.g., 4)."""
+    cells = []
+    for (y1, y2) in bands:
+        lo, hi = y1*scale, y2*scale
+        here = [l for l in lines if lo <= l["y"] <= hi]
+        if here:
+            # ← SORT BY Y FIRST (top to bottom), THEN X (left to right)
+            here.sort(key=lambda x: (x["y"], x["x"]))
+            txt = " ".join(l["text"] for l in here)
+            conf = min(l["confidence"] for l in here)
+            cells.append({"text": txt, "confidence": conf})
+        else:
+            cells.append({"text": "", "confidence": 0.0})
+    return cells
+
+def docai_extract_column(img_bgr, column_name: str):
+    """
+    Column-specific processing:
+    - PartNumber: Raw DocAI only (no borders, no hough)
+    - Quantity: Borders → Hough → Spacing+Upscale+Sharpen → DocAI
+    - Others (Desc/Material): Borders → Hough → DocAI
+    """
+    column_lower = (column_name or "").lower()
+    
+    # PartNumber: NO preprocessing, just raw DocAI
+    if column_lower == "partnumber":
+        lines = _docai_lines(img_bgr)  # ← Direct DocAI on raw image
+        if not lines:
+            return []  # triggers fallback (Paddle only)
+        # Since there's no cell detection, return as single-cell rows
+        return [{"text": l["text"], "confidence": l["confidence"]} for l in lines]
+    
+    # For all other columns: apply border completion + hough
+    #img_done = complete_outer_borders_only(img_bgr)
+    img_done = add_top_bottom_borders(img_bgr)
+    bands = detect_cell_borders(img_done)
+    if not bands:
+        return []  # triggers fallback chain
+
+    # Quantity: special processing
+    if column_lower == "quantity":
+        spaced, spaced_bands = add_vertical_spacing(img_done, bands, spacing_px=25)
+        up = upscale_image(spaced, 4)
+        fin = sharpen_image(up, 1.5)
+        lines = _docai_lines(fin)
+        return _map_to_bands(lines, spaced_bands, scale=4.0)
+    
+    # Description/Material: borders + hough only (no scaling)
+    else:
+        lines = _docai_lines(img_done)
+        return _map_to_bands(lines, bands, scale=1.0)
+
+def log_backend_choice(run_id: str, column: str, winner: str):
+    """Try to log to Google Sheets; if not configured, fall back to webhook; else just log."""
+    row = [
+        datetime.datetime.utcnow().isoformat(),
+        run_id,
+        column,
+        1 if winner == "docai" else 0,
+        1 if winner == "openai" else 0,
+        1 if winner == "paddle" else 0,
+    ]
+
+    # 1) Prefer Google Sheets API if SHEET_ID is set
+    try:
+        if SHEET_ID:
+            svc = _get_sheets_service()
+            if svc:
+                body = {"values": [row]}
+                svc.spreadsheets().values().append(
+                    spreadsheetId=SHEET_ID,
+                    range=f"{SHEET_TAB}!A:F",
+                    valueInputOption="RAW",
+                    insertDataOption="INSERT_ROWS",
+                    body=body,
+                ).execute()
+                logger.info("[LOG] wrote row to Google Sheets")
+                return
+    except Exception as e:
+        logger.warning(f"[LOG] Sheets write failed: {e}")
+
+    # 2) Optional fallback to webhook (keep your existing env if you like)
+    url = os.getenv("SHEET_LOG_WEBHOOK_URL")
+    if url:
+        try:
+            httpx.post(
+                url,
+                json={
+                    "run": run_id,
+                    "column": column,
+                    "google_doc_ai": row[3],
+                    "openai": row[4],
+                    "paddleocr": row[5],
+                },
+                timeout=5.0,
+            )
+            logger.info("[LOG] wrote row via webhook fallback")
+            return
+        except Exception as e:
+            logger.warning(f"[LOG] webhook failed: {e}")
+
+    # 3) Else: just log to stdout
+    logger.info(f"[LOG] (no sheets/webhook) run={run_id} column={column} winner={winner}")
 
 # Process image with OCR
 def simple_cells(img_rgb):
@@ -303,7 +699,138 @@ def advanced_cells(img):
         })
 
     return rows
+'''
+def gemini_extract_column(image_bytes, column_name):
+    """
+    Extract a single column from image using Gemini Vision.
+    Returns list of dicts: [{text: str, confidence: float}]
+    """
+    try:
+        if not GEMINI_API_KEY:
+            raise Exception("Gemini API key not configured")
+        
+        # Encode image to base64
+        image_b64 = base64.b64encode(image_bytes).decode('utf-8')
+        
+        # Column-specific prompts
+        prompts = {
+            "PartNumber": "Extract valid text from this table column. Return whole cell content per line, nothing else. If a cell has multiple lines, combine them into one line.",
+            "Quantity": "Extract valid text from this table column. Return whole cell content per line, nothing else. If a cell has multiple lines, combine them into one line.",
+            "Description": "Extract valid text from this table column. Return whole cell content per line, nothing else. If a cell has multiple lines, combine them into one line.",
+            "Material": "Extract valid text from this table column. Return whole cell content per line, nothing else. If a cell has multiple lines, combine them into one line."
+        }
+        
+        prompt = prompts.get(column_name, prompts["Description"])
+        
+        model = genai.GenerativeModel('models/gemini-2.5-flash')
+        response = model.generate_content([
+            prompt + "\n\nIMPORTANT: Each table row should produce exactly ONE line in your output, even if the cell text spans multiple lines in the image.",
+            {
+                'mime_type': 'image/jpeg',
+                'data': image_b64
+            }
+        ])
+        
+        # Parse response
+        text = response.text.strip()
+        lines = [line.strip() for line in text.split('\n') if line.strip()]
+        
+        # Return in same format as PaddleOCR
+        result = []
+        for line in lines:
+            result.append({
+                "text": line,
+                "confidence": 0.95  # Gemini doesn't provide confidence, use high default
+            })
+        
+        logger.info(f"✅ Gemini extracted {len(result)} items for {column_name}")
+        return result
+        
+    except Exception as e:
+        logger.error(f"❌ Gemini extraction failed: {e}")
+        raise
+'''
 
+def openai_extract_column(image_bytes, column_name):
+    """
+    Extract column using OpenAI GPT-4o Vision
+    """
+    try:
+        if not openai_client:
+            raise Exception("OpenAI API key not configured")
+        
+        image_b64 = base64.b64encode(image_bytes).decode('utf-8')
+        
+        response = openai_client.chat.completions.create(
+    model="gpt-4o",
+    messages=[
+        {
+            "role": "system",
+            "content": "You are a specialized OCR extraction tool. Extract only visible text from images. Never provide explanations, commentary, or conversational responses. Output only the extracted data."
+        },
+        {
+            "role": "user",
+            "content": [
+                {
+                    "type": "text",
+                    "text": """Analyze this table column image and extract cell contents.
+.
+Cell identification: Count ONLY horizontal border lines to identify cells. Ignore vertical spacing/whitespace.
+Multi-line handling: If text wraps onto multiple lines within one cell, join with single space.
+Whitespace handling: Empty vertical space within bordered cells is NOT a separate cell - skip it completely.
+Independence: Each cell value is independent. Never reference or copy from other cells.
+Format: Return one line per cell with text, top to bottom order. Skip lines for cells with only whitespace.
+Empty cells: If a bordered cell has no text at all, skip it (do not output blank line).
+
+Critical: A cell is defined by horizontal borders, NOT by vertical spacing. Large vertical gaps within one bordered area are still ONE cell.
+IMPORTANT: If consecutive cells contain identical or similar text, output each occurrence separately. Do NOT merge or deduplicate cells with same content. Each bordered cell must appear in output regardless of similarity to adjacent cells.
+Warning : Return in same order, don't change any order
+Output the cell values only, nothing else."""
+                },
+                {
+                    "type": "image_url",
+                    "image_url": {"url": f"data:image/jpeg;base64,{image_b64}"}
+                }
+            ]
+        }
+    ],
+    max_tokens=500,
+    temperature=0
+)
+        
+        text = response.choices[0].message.content.strip()
+        
+        # Strip markdown formatting
+        if text.startswith('```'):
+            lines_split = text.split('\n')
+            text = '\n'.join(lines_split[1:-1]) if len(lines_split) > 2 else text
+            text = text.replace('```', '').strip()
+        
+        # Detect conversational responses
+        lower_text = text.lower()
+        reject_phrases = [
+            "i cannot", "i can't", "sorry", "unable to",
+            "appears to", "seems to", "the image", "this is",
+            "how can i", "what would", "please provide"
+        ]
+        
+        if any(phrase in lower_text for phrase in reject_phrases):
+            logger.warning(f"GPT-4o returned conversational text: {text[:80]}")
+            raise Exception("Conversational response detected")
+        
+        lines = [line.strip() for line in text.split('\n')]
+        
+        if not lines:
+            raise Exception("Empty extraction")
+        
+        result = [{"text": line, "confidence": 0.50} for line in lines]
+        
+        logger.info(f"GPT-4o extracted {len(result)} items")
+        return result
+        
+    except Exception as e:
+        logger.error(f"GPT-4o extraction failed: {e}")
+        raise
 # Working fine except multiline text extraction
 # def advanced_cells(img):
 
@@ -566,10 +1093,49 @@ async def ocr_endpoint(request: Request):
 
             # table mode: choose by column tag
             elif mode == "table":
+                run_id = form.get("run") or uuid.uuid4().hex[:8]
+                column_lower = (column_id or "").lower()
+            
+                # 1) Try Google Document AI (with special treatment for Quantity/PartNumber)
+                try:
+                    table_cells = docai_extract_column(img, column_id or "")
+                    
+                    # ====== NEW: QUANTITY SINGLE-CELL FALLBACK ======
+                    if column_lower == "quantity" and len(table_cells) == 1:
+                        logger.warning(f"⚠️ Quantity column: Only 1 cell detected by DocAI, falling back to OpenAI")
+                        raise Exception("Single cell detected - triggering OpenAI fallback")
+                    # ====== END QUANTITY FALLBACK ======
+                    
+                    if any(c.get("text") for c in table_cells):
+                        log_backend_choice(run_id, column_id or "", "docai")
+                        return {"mode": "table", "column": column_id, "table": table_cells, "engine": "docai"}
+                except Exception as e:
+                    logger.warning(f"DocAI failed: {e}")
+            
+                # 2) Fallback logic depends on column type
+                # For PartNumber: skip OpenAI, go straight to Paddle
+                if column_lower == "partnumber":
+                    logger.info(f"PartNumber column: Skipping OpenAI, using Paddle fallback")
+                    rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+                    paddle_cells = simple_cells(rgb)
+                    log_backend_choice(run_id, column_id or "", "paddle")
+                    return {"mode": "table", "column": column_id, "table": paddle_cells, "engine": "paddle"}
+            
+                # For other columns: try OpenAI then Paddle
+                try:
+                    result = openai_extract_column(image_bytes, column_id or "")
+                    if result and any(r.get("text") for r in result):
+                        log_backend_choice(run_id, column_id or "", "openai")
+                        return {"mode": "table", "column": column_id, "table": result, "engine": "openai"}
+                except Exception as e:
+                    logger.warning(f"OpenAI fallback failed: {e}")
+            
+                # 3) Last fallback: PaddleOCR
                 rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-                table_cells = simple_cells(rgb)
-                logger.info(f"Using simple_cells for column: {column_id}")
-                return {"mode": mode, "table": table_cells}
+                paddle_cells = simple_cells(rgb)
+                log_backend_choice(run_id, column_id or "", "paddle")
+                return {"mode": "table", "column": column_id, "table": paddle_cells, "engine": "paddle"}
+                
                 # # quantity gets the old per‐line logic
                 # if column_id == "quantity":
                 #     rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
@@ -1182,6 +1748,80 @@ async def generate_missing_childpart_pdf(request: Request):
         print(traceback.format_exc())
         return JSONResponse(status_code=500, content={"error": str(e)})
 
+@app.post("/ocr-vision")
+async def ocr_vision_endpoint(request: Request):
+    """
+    OpenAI Vision OCR endpoint with PaddleOCR fallback
+    """
+    try:
+        form = await request.form()
+        
+        if "image" not in form:
+            return JSONResponse(status_code=400, content={"error": "Missing image"})
+        if "column" not in form:
+            return JSONResponse(status_code=400, content={"error": "Missing column parameter"})
+        
+        image_file = form["image"]
+        column_name = form["column"]
+        
+        logger.info(f"🔍 Vision OCR request for column: {column_name}")
+        
+        # Read image bytes
+        image_bytes = await image_file.read()
+        
+        # Try OpenAI first
+        try:
+            def do_vision_ocr():
+                return openai_extract_column(image_bytes, column_name)
+            
+            result = await asyncio.to_thread(do_vision_ocr)
+            
+            # Validate response
+            if not result or len(result) == 0:
+                logger.warning("⚠️ OpenAI returned empty result, falling back to PaddleOCR")
+                raise Exception("Empty result from OpenAI")
+            
+            # Check for conversational response
+            first_text = result[0]["text"].lower()
+            conversational_indicators = ["how can i", "i can help", "please provide", "?", "sorry", "i cannot"]
+            if any(indicator in first_text for indicator in conversational_indicators):
+                logger.warning(f"⚠️ OpenAI returned conversational response: {first_text[:50]}, falling back to PaddleOCR")
+                raise Exception("Conversational response detected")
+            
+            logger.info(f"✅ OpenAI extracted {len(result)} items for {column_name}")
+            return {
+                "mode": "vision",
+                "column": column_name,
+                "table": result
+            }
+            
+        except Exception as openai_error:
+            logger.warning(f"⚠️ OpenAI failed: {openai_error}, attempting PaddleOCR fallback")
+            
+            # Fallback to PaddleOCR
+            nparr = np.frombuffer(image_bytes, np.uint8)
+            img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+            rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+            
+            def do_paddle_ocr():
+                return simple_cells(rgb)
+            
+            paddle_result = await asyncio.to_thread(do_paddle_ocr)
+            
+            logger.info(f"✅ PaddleOCR fallback extracted {len(paddle_result)} items for {column_name}")
+            return {
+                "mode": "paddleocr_fallback",
+                "column": column_name,
+                "table": paddle_result
+            }
+        
+    except Exception as e:
+        import traceback
+        logger.error(f"❌ Both OpenAI and PaddleOCR failed: {e}\n{traceback.format_exc()}")
+        return JSONResponse(
+            status_code=500,
+            content={"error": f"OCR failed: {str(e)}"}
+        )
 
 
 @app.get("/debug")

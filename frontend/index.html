@@ -247,7 +247,78 @@
             color: #fff;
             font-weight: 700;
         }
-
+        /* Hide append mode button */
+        #append-mode-btn {
+            display: none !important;
+        }
+        /* Append Mode Toggle Button */
+        /* ========== iOS-Style Toggle Switch ========== */
+        #append-mode-btn {
+            position: relative;
+            width: 120px;
+            height: 32px;
+            border: none;
+            border-radius: 16px;
+            padding: 0;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            background-color: #444;
+            overflow: hidden;
+        }
+        
+        #append-mode-btn.append-mode-off {
+            background-color: #444;
+        }
+        
+        #append-mode-btn.append-mode-on {
+            background-color: #22c55e;
+        }
+        
+        /* Text inside toggle */
+        #append-mode-btn::before {
+            content: attr(data-label);
+            position: absolute;
+            left: 50%;
+            top: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 12px;
+            font-weight: 600;
+            color: #fff;
+            z-index: 1;
+            pointer-events: none;
+        }
+        
+        #append-mode-btn.append-mode-off::before {
+            content: "Append: OFF";
+            color: #999;
+        }
+        
+        #append-mode-btn.append-mode-on::before {
+            content: "Append: ON";
+            color: #000;
+        }
+        
+        /* Sliding Circle */
+        #append-mode-btn::after {
+            content: "";
+            position: absolute;
+            top: 4px;
+            left: 4px;
+            width: 24px;
+            height: 24px;
+            background-color: #fff;
+            border-radius: 50%;
+            transition: transform 0.3s ease;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+        }
+        
+        #append-mode-btn.append-mode-on::after {
+            transform: translateX(88px);  /* Slide to right */
+        }
+        
+        #append-mode-btn:hover {
+            opacity: 0.9;
+        }
         /* ---------- --- Upload area as Heading Row--- ------  */
         /* Just override for header-row */
         .upload-row.header-row {
@@ -268,9 +339,9 @@
         /* --------------------- Handsontable Area --------------------- */
         #handsontable-container {
             max-height: none;
-            height: 500px;
-            overflow-y: auto;
+            height: calc(100vh - 80px);
             overflow-x: auto;
+            overflow-y: auto;
             flex: 1 1 auto;
             min-width: 0;
         }
@@ -344,7 +415,6 @@
             background-color: #0a0a0a;
             color: #ffffff !important;
             border-color: #222222 !important;
-
             white-space: normal !important;
             word-break: break-word !important;
             overflow-wrap: break-word !important;
@@ -420,6 +490,10 @@
             /* Same as current cell */
         }
 
+        .handsontableInput {
+            box-shadow: inset 0 0 0 2px #D99E01;
+        } 
+        
         /* Input fields when editing */
         .handsontable .handsontableInputHolder textarea.handsontableInput,
         .handsontable .handsontableInputHolder input.handsontableInput {
@@ -646,24 +720,6 @@
             text-align: center;
         }
 
-
-
-        /* More specific class targeting */
-        .handsontable textarea.handsontableInput,
-        .handsontable input.handsontableInput {
-            background-color: #ffffff !important;
-            color: #000000 !important;
-            border: 1px solid #ccc !important;
-        }
-
-        .handsontable .htCore .htEditor {
-            background-color: #ffffff !important;
-        }
-
-        .handsontable .wtHolder textarea,
-        .handsontable .wtHolder input {
-            background: #ffffff !important;
-        }
 
         /* Instructions bar above the table */
         .instructions {
@@ -975,12 +1031,15 @@
         }
 
         /* Low similarity warning for dropdown cells */
+        /* Low similarity warning for dropdown cells — icon only, preserve bg */
         .low-similarity-cell {
             background-color: a(255, 193, 7, 0.3) !important;
             /* Yellow warning background */
             border: 1px solid #ffc107 !important;
             position: relative;
         }
+
+
 
         /* Warning icon for low similarity cells */
         .low-similarity-cell::after {
@@ -1073,6 +1132,78 @@
             cursor: pointer;
             font-size: 12px;
         }
+/* —— Centered overlay for instructions hover —— */
+#instr-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.6);
+  display: none;           /* Hidden by CSS - aria-hidden managed by JS */
+  z-index: 2000;
+}
+
+#instr-modal-card {
+  position: fixed;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%,-50%);
+  background: #1a1a1a;
+  border: 1px solid #444;
+  border-radius: 8px;
+  width: min(90vw, 900px);
+  max-height: 85vh;
+  padding: 12px 12px 16px 12px;
+  box-shadow: 0 12px 32px rgba(0,0,0,0.45);
+}
+
+#instr-modal-close {
+  position: absolute;
+  right: 8px;
+  top: 8px;
+  width: 30px;
+  height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #bbb;            /* high-contrast pill */
+  color: #000;                     /* black glyph on yellow */
+  border: none;
+  border-radius: 4px;           
+  font-size: 22px;                 /* larger × */
+  font-weight: 500;
+  line-height: 1;
+  cursor: pointer;
+  opacity: 1;                      /* always fully visible */
+  box-shadow: 0 4px 12px rgba(0,0,0,0.35);
+  z-index: 1;                      /* above modal content */
+  outline: none;
+}
+#instr-modal-close:hover {
+  background: #c18d00;            /* slight darken on hover */
+}
+#instr-modal-close:focus-visible {
+  outline: none;                  /* border removed */
+  outline-offset: 0;
+}
+
+
+#instr-modal-close:hover { opacity: 1; }
+
+#instr-modal-body {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: calc(85vh - 48px);
+  overflow: auto;          /* allow scroll if content grows */
+  border-radius: 4px;
+}
+
+/* Default image styling for the template content (safe to remove if you switch content) */
+#instr-modal-body img {
+  display: block;
+  width: 100%;
+  height: auto;
+  object-fit: contain;
+}
 
         /* --------------------- Responsive Behavior --------------------- */
         @media (max-width: 960px) {
@@ -1122,7 +1253,7 @@
 
                     <!-- Buttons container - always right (using span) -->
                     <span class="buttons-container">
-                        <button id="extract-btn">Extract</button>
+                        <button id="append-mode-btn" class="append-mode-off"></button>
                         <button id="submit-btn">Submit</button>
                     </span>
                 </div>
@@ -1239,6 +1370,7 @@ let hot;
 let windowChildParts = []; // expose on window for debugging
 let _cutBackup = [];
 let hasWarningNotificationShown = false;
+let isAppendMode = false; // Track append mode state
 let lastOcrBomItem = 0;
 let rowID = null;
 
@@ -1288,34 +1420,68 @@ function isDuplicateChildpartSelection(value, rowIndex) {
             rowID = urlParams.get("rowID");
             lastOcrBomItem = parseInt(urlParams.get("item") || "0"); 
             
+            console.log("🔍 URL Params Debug:");
+            console.log("  project:", project);
+            console.log("  partNumber:", partNumber);
+            console.log("  parentDrgNum:", parentDrgNum);
             console.log("  rowID:", rowID);
             console.log("  lastOcrBomItem:", lastOcrBomItem);
-
+        
             if (!project || !partNumber || !parentDrgNum || !rowID) {
+                console.error("❌ Missing required params!");
                 showNotification("Missing required query params: project/part/parentdrgnum/rowID", 'error');
-                // Do not return; always initialize table even if params are missing
             } else {
                 try {
+                    console.log("📡 Fetching child parts from backend...");
                     const resp = await fetch(
-                        "https://dev-ocr-table-extractor.onrender.com/fetch-drawings",
+                        "https://ocr-gemini-test.onrender.com/fetch-drawings",
                         {
                             method: "POST",
                             headers: { "Content-Type": "application/json" },
                             body: JSON.stringify({ project, part: partNumber }),
                         }
                     );
+                    
+                    console.log("📡 Response status:", resp.status);
+                    
+                    if (!resp.ok) {
+                        throw new Error(`HTTP error! status: ${resp.status}`);
+                    }
+                    
                     const data = await resp.json();
+                    console.log("📡 Raw response data:", data);
+                    
+                    if (!data.rows || !Array.isArray(data.rows)) {
+                        console.error("❌ Invalid response format:", data);
+                        throw new Error("Invalid response format from backend");
+                    }
+                    
                     windowChildParts = data.rows.map((r) =>
                         decodeURIComponent(r.drawingNumber || "")
                     );
-                    console.log("✅ Decoded Part Numbers:", windowChildParts);
+                    
+                    console.log("✅ Child parts loaded successfully!");
+                    console.log("✅ Total child parts:", windowChildParts.length);
+                    console.log("✅ First 5 parts:", windowChildParts.slice(0, 5));
+                    
+                    if (windowChildParts.length === 0) {
+                        console.warn("⚠️ WARNING: No child parts returned from backend!");
+                        showNotification("No child parts found for this drawing", 'warning');
+                    }
+                    
                 } catch (err) {
-                    console.error("Error fetching drawing data:", err);
-                    windowChildParts = []; // Fallback to empty array
+                    console.error("❌ CRITICAL ERROR fetching drawing data:", err);
+                    console.error("❌ Error details:", err.message);
+                    windowChildParts = [];
+                    showNotification(`Failed to load child parts: ${err.message}`, 'error');
                 }
             }
-            // Always initialize Handsontable, even if fetch fails or params are missing
+            
+            // Always initialize Handsontable
+            console.log("🎨 Initializing Handsontable...");
             initializeHandsontable();
+// Ensure default instructions are visible on startup
+showDefaultInstructions();
         });
 
         // Sequential character matching + best‐match utility
@@ -1731,55 +1897,70 @@ function isDuplicateChildpartSelection(value, rowIndex) {
                     
                     // ADD THIS VALIDATOR FUNCTION:
                     validator: isMatched ? function(value, callback) {
-                        const selection = hot.getSelected();
-                        if (!selection) {
-                            callback(true);
-                            return;
-                        }
-                        
-                        const currentRow = selection[0][0];
-                        const rowData = hot.getSourceDataAtRow(currentRow) || {};
-                        const currentType = (rowData?.Type || "").trim();
-                        
-                        // Allow empty values
-                        if (!value || value.toString().trim() === "") {
-                            callback(true);
-                            return;
-                        }
-                        
-                        // BO and Missing Drawing rows: accept ANY value
-                        if (currentType === "BO" || currentType === TYPE_DISPLAY_NAMES["Missing Childpart"]) {
-                            callback(true);
-                            return;
-                        }
-                        
-                        // Child Part rows: strict validation
-                        if (currentType === "Child Part") {
-                            const isValidChildpart = windowChildParts.includes(value.toString());
-                            
-                            if (!isValidChildpart) {
-                                setTimeout(() => {
-                                    showNotification(`"${value}" is not a valid child part. Please select from the dropdown.`, 'error');
-                                }, 10);
-                                callback(false);
-                                return;
-                            }
-                            
-                            // Check for duplicates
-                            const isDuplicate = isDuplicateChildpartSelection(value.toString(), currentRow);
-                            if (isDuplicate) {
-                                setTimeout(() => {
-                                    showNotification(`"${value}" is already used in another Child Part row.`, 'error');
-                                }, 10);
-                                callback(false);
-                                return;
-                            }
-                        }
-                        
-                        // Default: accept value
+                      // ✅ row-accurate: use validator context instead of selection
+                      const hotInstance = this.instance || hot;
+                      const currentRow =
+                        (typeof this.row === 'number')
+                          ? this.row
+                          : (hotInstance?.getSelected?.()?.[0]?.[0] ?? 0);
+                    
+                      const rowData = hotInstance.getSourceDataAtRow(currentRow) || {};
+                      const currentType = (rowData?.Type || "").trim();
+                    
+                      // Always allow empty
+                      if (!value || value.toString().trim() === "") {
+                        spreadsheetData[currentRow]["_missingDrawing"] = false;
                         callback(true);
+                        return;
+                      }
+                    
+                      // BO / Missing Drawing → accept anything
+                      if (currentType === "BO" || currentType === TYPE_DISPLAY_NAMES["Missing Childpart"]) {
+                        callback(true);
+                        return;
+                      }
+                    
+                      // Child Part → flag instead of reject
+                      if (currentType === "Child Part") {
+                        const val = value.toString().trim();
+                        const isValidChildpart = windowChildParts.includes(val);
+                    
+                        if (!isValidChildpart) {
+                          spreadsheetData[currentRow]["_missingDrawing"] = true;
+                          const partText = (rowData["PartNumber"]?.text) || "";
+                          spreadsheetData[currentRow]["_similarityScore"] =
+                            partText ? sequentialCharacterMatch(partText, val) : 0;
+                    
+                          setTimeout(() => {
+                            showNotification(`"${val}" is not a valid child part.`, 'error');
+                            requestNotificationRefreshOnce();
+                            hotInstance.render();   // ← use the local instance
+                          }, 10);
+                    
+                          callback(true); // keep invalid value but flagged
+                          return;
+                        }
+                    
+                        // Duplicate → notify but don’t reject
+                        if (isDuplicateChildpartSelection(val, currentRow)) {
+                          setTimeout(() => {
+                            showNotification(`"${val}" is already used in another Child Part row.`, 'error');
+                            requestNotificationRefreshOnce();
+                            hotInstance.render();
+                          }, 10);
+                          callback(true);
+                          return;
+                        }
+                    
+                        // Valid → clear flag
+                        spreadsheetData[currentRow]["_missingDrawing"] = false;
+                      }
+                    
+                      callback(true);
                     } : undefined,
 
+
+                    allowInvalid: true, // ✅ let invalid stick so we can flag it
                     
                     readOnly: false, // all columns remain editable
                     wordWrap: true, // ✅ enable per-column wrap
@@ -1795,7 +1976,7 @@ function isDuplicateChildpartSelection(value, rowIndex) {
                                     td.classList.add("type-child-part");
                                 } else if (value === "BO") {
                                     td.classList.add("type-bo");
-                                    hot.setCellMeta(row, 0, 'className', 'bo-row');
+                                    // hot.setCellMeta(row, 0, 'className', 'bo-row');
                                 } else if (value === TYPE_DISPLAY_NAMES["Missing Childpart"]) {
                                     td.classList.add("type-missing-childpart");
                                 }
@@ -1919,12 +2100,13 @@ function isDuplicateChildpartSelection(value, rowIndex) {
                 dropdownMenu: false,
                 filters: true,
                 width: '100%',
-                heigth: '100%',
+                height: '100%',
                 autoColumnSize: true,
                 stretchH: 'all',
                 wordWrap: true,
                 manualColumnResize: true,
                 autoRowSize: true,
+                fillHandle: { autoInsertRow: true }, // for drag handling
                 outsideClickDeselects: true,
                 licenseKey: "non-commercial-and-evaluation",
 
@@ -1986,16 +2168,28 @@ function isDuplicateChildpartSelection(value, rowIndex) {
                         <div class="file-status">Processing...</div>
                         <div class="ocr-image-preview" style="display: none !important;"></div>
                     `;
-
+                    
                     // Clear existing TH content and add upload area
                     TH.innerHTML = "";
                     TH.appendChild(uploadArea);
-
+                    
+                    // ✅ Block header clicks from bubbling to HOT (prevents column selection)
+                    ['mousedown', 'click', 'dblclick', 'touchstart'].forEach(ev => {
+                      uploadArea.addEventListener(ev, e => e.stopPropagation(), { capture: true });
+                    });
+                    
+                    // ✅ Also stop events on the file input itself
+                    const fileInput = uploadArea.querySelector('input[type="file"]');
+                    ['mousedown', 'click', 'dblclick', 'touchstart'].forEach(ev => {
+                      fileInput.addEventListener(ev, e => e.stopPropagation(), { capture: true });
+                    });
+                    
                     // Reinitialize Lucide icons for this new element
                     lucide.createIcons();
-
-                    // Add this single line at the end of your afterGetColHeader function
+                    
+                    // Keep drag & drop on the header upload
                     addDragDropListeners(uploadArea);
+
 
                     // Reattach event listeners for this specific upload area
                     const input = uploadArea.querySelector("input");
@@ -2035,13 +2229,72 @@ function isDuplicateChildpartSelection(value, rowIndex) {
                             });
                     }, 0);
                 },
+                afterOnCellMouseDown: function (event, coords, TD) {
+                  if (coords.row < 0 || coords.col < 0) return;      // ignore headers/spares
+                  const prop = this.colToProp(coords.col);
+                  if (prop !== 'Type' && prop !== 'Matched Childpart') return;
+                
+                  if (typeof hideSmartOverlay === 'function') hideSmartOverlay();
+                  
+                  // ✅ FIX: Get current value BEFORE starting edit
+                  const currentValue = this.getDataAtCell(coords.row, coords.col) || '';  
+                
+                  // If an editor is already open on this cell, do nothing (prevents flicker)
+                  const active = this.getActiveEditor?.();
+                  if (active && active.isOpened && active.isOpened()) return;
+                    
+                  // Select the cell and start editing with preserved value
+                  this.selectCell(coords.row, coords.col);
+                    
+                  // Let Handsontable select the cell first, then start editing so the list opens on single click
+                  requestAnimationFrame(() => {
+                    const editor = this.getActiveEditor?.();
+                    if (!editor) return;
+                
+                    // Seed with empty string → your source() will return the full list
+                    if (typeof editor.beginEditing === 'function') editor.beginEditing(currentValue);
+                
+                    // For HOT 12, Autocomplete/Dropdown editors expose open()
+                    if (typeof editor.open === 'function') editor.open();
+                  });
+                },
             });
-
+            // --- keep current value when opening Type / Matched Childpart editors
+            hot.addHook('afterBeginEditing', function (row, col) {
+              const prop = this.colToProp(col);
+              if (prop !== 'Type' && prop !== 'Matched Childpart') return;
+            
+              const editor = this.getActiveEditor?.();
+              const current = (this.getDataAtCell(row, col) || '').toString();
+            
+              // defer 1 frame so the editor DOM is mounted, then restore the text & caret
+              requestAnimationFrame(() => {
+                if (editor && editor.TEXTAREA) {
+                  editor.TEXTAREA.value = current;
+                  editor.TEXTAREA.selectionStart = editor.TEXTAREA.selectionEnd = editor.TEXTAREA.value.length;
+                }
+              });
+            });
+            // immediate repaint helper
+            function repaintNow() {
+              if (!hot) return;
+              requestAnimationFrame(() => hot.render());
+            }
+            
+            // repaint when cell classes change (e.g., quantity-error-cell, needs-review-cell)
+            hot.addHook('afterSetCellMeta', function (row, col, key) {
+              if (key === 'className') repaintNow();
+            });
+            
+            // repaint after any validator completes (covers Enter, Paste, etc.)
+            hot.addHook('afterValidate', function () {
+              repaintNow();
+            });
             // --- Unified afterChange handler: edit, cut, paste -----------------------------------------------
             hot.addHook('afterChange', (changes, source) => {
             
                 if (!changes) return;
-                if (source === 'edit') {
+                if (source === 'edit' || source === 'CopyPaste.paste' || source === 'Autofill.fill') {
                   resetNotificationGate();
                 }
 
@@ -2081,29 +2334,30 @@ function isDuplicateChildpartSelection(value, rowIndex) {
                     changes.forEach(([row, prop], idx) => {
                         const colKey = prop.split('.')[0];
                         if (!['Quantity', 'Description', 'Material'].includes(colKey)) return;
-
+                
                         const colIndex = hot.propToCol(prop);
-                        const restored = isCutPaste ? _cutBackup[idx]?.conf ?? 0 : 0;   // 0 for copy‑paste
-
+                        const restored = isCutPaste ? _cutBackup[idx]?.conf ?? 0 : 0;
+                
                         // set confidence
                         spreadsheetData[row][colKey].confidence = restored;
-
+                
                         // build classes
                         let classes = (hot.getCellMeta(row, colIndex).className || '')
                             .split(' ')
                             .filter(cls => cls !== 'user-edited-ocr' && cls !== 'edited-cell');
-
+                
                         if (restored === 0) classes.push('edited-cell', 'user-edited-ocr');
                         hot.setCellMeta(row, colIndex, 'className', classes.join(' ').trim());
                     });
                     // clear backup after every paste
                     _cutBackup = [];
                     hot.render();
-                    return;
+                    // ✅ NO RETURN - Let validation run for Type and PartNumber columns
                 }
 
                 // ===== 3. STANDARD EDIT branch =================================
-                if (source === 'edit') {
+                const shouldValidate = (source === 'edit' || source === 'CopyPaste.paste' || source === 'Autofill.fill');
+                if (shouldValidate) {
                     changes.forEach(([row, prop, oldVal, newVal]) => {
                         if (oldVal === newVal) return;
 
@@ -2112,158 +2366,272 @@ function isDuplicateChildpartSelection(value, rowIndex) {
                         hot.setCellMeta(row, colIndex, 'className', 'edited-cell');
 
                         // OCR columns: zero confidence & force default bg
+                        // OCR columns: zero confidence & force default bg
                         if (['Quantity.text', 'Description.text', 'Material.text'].includes(prop)) {
-                            spreadsheetData[row][prop.split('.')[0]].confidence = 0;
-                            // --- Begin new logic for className to preserve quantity-error-cell ---
-                            // Get existing classes
-                            let existingClasses = hot.getCellMeta(row, colIndex).className || "";
-                            let classes = new Set(existingClasses.split(/\s+/).filter(Boolean));
-
-                            // Add edited markers
-                            classes.add('edited-cell');
-                            classes.add('user-edited-ocr');
-
-                            // Preserve quantity-error-cell if still invalid
+                          const colKey = prop.split('.')[0];
+                          const colIndex = hot.propToCol(prop);
+                    
+                          // ✅ Cut→Paste guard:
+                          // If this change came from a paste AND the cell has non-zero confidence right now,
+                          // it means your PASTE block just restored OCR confidence. Don’t zero it or flag as user-edited.
+                          const keepPastedConfidence = (source === 'CopyPaste.paste') &&
+                                                       ((spreadsheetData[row]?.[colKey]?.confidence ?? 0) > 0);
+                    
+                          if (keepPastedConfidence) {
+                            // Keep only the quantity error icon in sync; leave other classes and bg as-is
                             if (prop === 'Quantity.text') {
-                                const textValue = spreadsheetData[row].Quantity?.text?.trim();
-                                const isInvalid = textValue && !/^\d+$/.test(textValue);
-                                if (isInvalid) {
-                                    classes.add('quantity-error-cell');
-                                } else {
-                                    classes.delete('quantity-error-cell');
-                                }
+                              const textValue = spreadsheetData[row].Quantity?.text?.trim();
+                              const isInvalid = textValue && !/^\d+$/.test(textValue);
+                              let existing = hot.getCellMeta(row, colIndex).className || '';
+                              let classes = new Set(existing.split(/\s+/).filter(Boolean));
+                              if (isInvalid) classes.add('quantity-error-cell'); else classes.delete('quantity-error-cell');
+                              hot.setCellMeta(row, colIndex, 'className', Array.from(classes).join(' '));
                             }
-
-                            hot.setCellMeta(row, colIndex, 'className', Array.from(classes).join(' '));
-                            // --- End new logic ---
-                            console.log(`🔧 User edited OCR cell: Row ${row}, Column ${prop}`);
+                            return; // ⬅️ skip zeroing & 'user-edited-ocr' for this pasted OCR cell
+                          }
+                    
+                          // 🔁 Normal manual edit / copy→paste path (previous behavior)
+                          spreadsheetData[row][colKey].confidence = 0;
+                    
+                          // --- Begin existing className logic (unchanged) ---
+                          let existingClasses = hot.getCellMeta(row, colIndex).className || "";
+                          let classes = new Set(existingClasses.split(/\s+/).filter(Boolean));
+                    
+                          // Add edited markers
+                          classes.add('edited-cell');
+                          classes.add('user-edited-ocr');
+                    
+                          // Preserve quantity-error-cell if still invalid
+                          if (prop === 'Quantity.text') {
+                            const textValue = spreadsheetData[row].Quantity?.text?.trim();
+                            const isInvalid = textValue && !/^\d+$/.test(textValue);
+                            if (isInvalid) { classes.add('quantity-error-cell'); } else { classes.delete('quantity-error-cell'); }
+                          }
+                          hot.setCellMeta(row, colIndex, 'className', Array.from(classes).join(' '));
+                          // --- End existing logic ---
+                          console.log(`🔧 User edited OCR cell: Row ${row}, Column ${prop}`);
                         }
 
-                        // Childpart validation against Type
+                        
+                        // Childpart validation against Type (ENHANCED - Order Independent)
                         if (prop === 'Matched Childpart') {
                             const rowData = hot.getSourceDataAtRow(row);
-                            const typeVal = rowData['Type'];
-                            console.log(`🔍 Select Childpart changed: "${newVal}", Type: "${typeVal}"`);
-
-                            // --- Duplicate guard for "Child Part" mapping ---
-                            // Determine what the Type will be for this row after this change.
-                            // If current Type is empty and the new value is a valid option,
-                            // our logic auto-sets it to "Child Part" (see below). We must
-                            // check duplicates against that prospective state as well.
-                            // Skip running the duplicate check on our own synthetic clear
-                            if (source !== 'validation-duplicate') {
-                              const prospectiveIsChildPart = (typeVal === 'Child Part') ||
-                                                             (!typeVal && newVal && windowChildParts.includes(newVal.toString()));
-                              if (prospectiveIsChildPart && newVal && newVal.toString().trim() !== '') {
-                                if (isDuplicateChildpartSelection(newVal.toString(), row)) {
-                                  hot.setDataAtCell(row, colIndex, '', 'validation-duplicate');
-                                  return;
+                            const typeVal = (rowData['Type'] || '').trim();
+                            console.log(`🔍 Matched Childpart changed: "${newVal}", Type: "${typeVal}"`);
+                        
+                            // ✅ SKIP BO and Missing Drawing rows - no validation needed
+                            if (typeVal === 'BO' || typeVal === TYPE_DISPLAY_NAMES["Missing Childpart"]) {
+                                console.log(`⏭️ Skipping validation for ${typeVal} row`);
+                                if (newVal && newVal.toString().trim() !== '') {
+                                    spreadsheetData[row]["_missingDrawing"] = false;
                                 }
-                              }
+                                refreshNotifications();
+                                return;
                             }
+                        
+                            // ✅ Define column indices FIRST (prevents undefined errors)
+                            const colIndex = hot.propToCol('Matched Childpart');
+                            const typeColIndex = hot.propToCol('Type');
+                        
+                            // 🆕 AUTO-MATCHING: When user pastes and Type is empty
+                            if (newVal && newVal.toString().trim() !== '' && !typeVal) {
+                                const pastedValue = newVal.toString().trim();
+                                
+                                if (windowChildParts && windowChildParts.length > 0) {
+                                    const best = findBestSequentialMatch(pastedValue, windowChildParts);
+                                    console.log(`🎖️ Best match for "${pastedValue}": "${best.bestMatch.target}" (${best.bestMatch.rating})`);
+                                    
+                                    if (best.bestMatch.rating > 0.85) {
+                                        const matchText = best.bestMatch.target;
+                                        
+                                        if (!isDuplicateChildpartSelection(matchText, row)) {
+                                            // Replace with better match + set Type (using custom source to prevent loops)
+                                            setTimeout(() => {
+                                                hot.setDataAtCell(row, colIndex, matchText, 'auto-validate');
+                                                hot.setDataAtCell(row, typeColIndex, 'Child Part', 'auto-validate');
+                                                spreadsheetData[row]["_similarityScore"] = best.bestMatch.rating;
+                                                spreadsheetData[row]["_missingDrawing"] = false;
+                                                console.log(`✅ Auto-matched "${pastedValue}" → "${matchText}"`);
+                                                refreshNotifications();
+                                            }, 10);
+                                            return;
+                                        } else {
+                                            // Duplicate - clear it
+                                            hot.setDataAtCell(row, colIndex, '', 'validation-duplicate');
+                                            showNotification(`"${matchText}" is already used in another Child Part row.`, 'error');
+                                            return;
+                                        }
+                                    } else {
+                                        // No good match - flag as missing
+                                        spreadsheetData[row]["Matched Childpart"] = pastedValue;
+                                        spreadsheetData[row]["_missingDrawing"] = true;
+                                        spreadsheetData[row]["_similarityScore"] = 0;
+                                        console.log(`❌ No match for "${pastedValue}" - flagged as missing`);
+                                    }
+                                }
+                            }
+                        
+                            // --- Duplicate guard (skip our own programmatic changes)
+                            if (source !== 'validation-duplicate' && source !== 'auto-validate') {
+                                const prospectiveIsChildPart = (typeVal === 'Child Part') ||
+                                                               (!typeVal && newVal && windowChildParts.includes(newVal.toString()));
+                                if (prospectiveIsChildPart && newVal && newVal.toString().trim() !== '') {
+                                  if (isDuplicateChildpartSelection(newVal.toString(), row)) {
+                                    showNotification(`"${newVal}" is already used in another Child Part row.`, 'error');
+                                    requestNotificationRefreshOnce();
+                                    hot.render();
+                                    return;
+                                  }
+                                }
 
-                            // ✅ ALWAYS clear missing drawing error when user provides ANY value
+                            }
+                        
+                            // ✅ Clear missing drawing flag when valid value provided
                             if (newVal && newVal.toString().trim() !== '') {
-                                // Clear missing drawing error
                                 spreadsheetData[row]["_missingDrawing"] = false;
-                                console.log(`✅ Cleared _missingDrawing flag - user selected: "${newVal}"`);
-
-                                // Auto-set Type to "Child Part" if:
-                                // 1. User selected a valid childpart from the list
-                                // 2. Type is currently empty/null
+                        
+                                // Auto-set Type if valid childpart and no Type set
                                 if (windowChildParts.includes(newVal.toString()) && !typeVal) {
-                                    const typeColIndex = hot.propToCol('Type');
-                                    hot.setDataAtCell(row, typeColIndex, 'Child Part');
-                                    console.log(`✅ Auto-set Type to "Child Part" for: "${newVal}"`);
+                                    hot.setDataAtCell(row, typeColIndex, 'Child Part', 'auto-validate');
                                 }   
                             }
-
-                            // Calculate similarity score for manual edits
+                        
+                            // Calculate similarity score with OCR data
                             const partCell = rowData["PartNumber"];
                             const partText = partCell?.text || "";
                             if (partText && newVal && newVal.toString().trim() !== '') {
                                 const sim = sequentialCharacterMatch(partText, newVal.toString());
                                 spreadsheetData[row]["_similarityScore"] = sim;
-                                console.log(`📊 Calculated similarity: ${sim}`);
                             } else if (!newVal || newVal.toString().trim() === '') {
-                                // Clear similarity when field is emptied
                                 delete spreadsheetData[row]["_similarityScore"];
-                                // Set missing drawing flag when field is cleared
                                 if (partText) {
                                     spreadsheetData[row]["_missingDrawing"] = true;
                                 }
                             }                         
-
+                        
+                            // ✅ Validate if Type is already "Child Part"
                             if (typeVal === 'Child Part' && newVal && newVal.toString().trim() !== '') {
-                                const isValid = windowChildParts.includes(newVal.toString());
-                                if (!isValid) {
-                                    console.warn(`⚠️ Invalid childpart selection: "${newVal}" - clearing cell`);
-                                    hot.setDataAtCell(row, colIndex, '', 'validation-clear');
-                                    showNotification(`"${newVal}" is not a valid child part. Please select from the dropdown list.`, 'error');
-                                    return;
-                                }
+                              const val = newVal.toString().trim();
+                              const isValid = windowChildParts.includes(val);
+                            
+                              if (!isValid) {
+                                spreadsheetData[row]["_missingDrawing"] = true;
+                                const partText = (hot.getSourceDataAtRow(row)["PartNumber"]?.text) || "";
+                                spreadsheetData[row]["_similarityScore"] = partText ? sequentialCharacterMatch(partText, val) : 0;
+                            
+                                showNotification(`"${val}" is not a valid child part.`, 'error');
+                                requestNotificationRefreshOnce();
+                                hot.render();
+                                return;
+                              } else {
+                                spreadsheetData[row]["_missingDrawing"] = false;
+                              }
                             }
 
+                        
                             refreshNotifications();
-                            // BO type always allowed
                         }
-
                         // In your afterChange handler, replace the Type validation section with:
                         if (prop === 'Type') {
-                            console.log(`🔄 Type changed to: "${newVal}" for row ${row}`);
-
-                            // CLEAR missing drawing flag when user manually sets Type to BO or Missing Drawing
+                          // ✅ normalize common pasted variants before the rest of your logic runs
+                          const canonicalizeType = (v) => {
+                            const s = (v ?? '').toString().trim().toLowerCase().replace(/\s+/g, '');
+                            if (s === 'childpart') return 'Child Part';
+                            if (s === 'bo' || s === 'boughtout' || s === 'b.o') return 'BO';
+                            if (s === 'missingdrawing' || s === 'missingchildpart')
+                              return TYPE_DISPLAY_NAMES["Missing Childpart"];
+                            return v;
+                          };
+                          const canonical = canonicalizeType(newVal);
+                          if (canonical !== newVal) {
+                            hot.setDataAtCell(row, hot.propToCol('Type'), canonical, 'auto-validate');
+                            return; // let the normalized value re-enter the same block
+                          }
+                        
+                            // CLEAR missing drawing flag when user sets Type to BO or Missing Drawing
                             if (newVal === 'BO' || newVal === TYPE_DISPLAY_NAMES["Missing Childpart"]) {
-                                spreadsheetData[row]["_missingDrawing"] = false; // ← ADD THIS
+                                spreadsheetData[row]["_missingDrawing"] = false;
                                 console.log(`✅ Cleared _missingDrawing flag for row ${row}`);
                             }
-
-                            // If changing TO Child Part, validate existing Matched Childpart value
+                        
+                            // ✅ ENHANCED: Validate when changing TO Child Part
                             if (newVal === 'Child Part') {
-                                const rowData = hot.getSourceDataAtRow(row);
-                                const existingMatch = rowData['Matched Childpart'];
-
-                                if (existingMatch && existingMatch.toString().trim() !== '') {
-                                    const isValid = windowChildParts.includes(existingMatch.toString());
-                                    if (!isValid) {
-                                        console.warn(`⚠️ Type changed to Child Part but "${existingMatch}" is not valid - clearing`);
-                                        // Use setTimeout to avoid event conflicts
-                                        setTimeout(() => {
-                                            showNotification(`"${existingMatch}" is not a valid child part. Please select from dropdown.`, 'error');
-                                            const matchColIndex = hot.propToCol('Matched Childpart');
-                                            hot.setDataAtCell(row, matchColIndex, '', 'validation-clear');
-                                        }, 10);
-                                        return;
-                                    }
+                              // ✅ GUARD: Skip our own programmatic changes (prevent loops)
+                              if (source === 'validation-clear' || source === 'auto-validate') {
+                                console.log(`⏭️ Skipping Type validation (source=${source})`);
+                                return;
+                              }
+                            
+                              const rowData = hot.getSourceDataAtRow(row);
+                              const existingMatch = rowData['Matched Childpart'];
+                            
+                              if (existingMatch && existingMatch.toString().trim() !== '') {
+                                const matchValue = existingMatch.toString().trim();
+                            
+                                // Check 1: Valid childpart?
+                                const isValid = windowChildParts.includes(matchValue);
+                            
+                                // Check 2: Duplicate?
+                                const isDuplicate = isDuplicateChildpartSelection(matchValue, row);
+                            
+                                if (!isValid) {
+                                  console.warn(`⚠️ Type→Child Part but "${matchValue}" not valid - flagging`);
+                                  spreadsheetData[row]["_missingDrawing"] = true;
+                                  spreadsheetData[row]["_similarityScore"] = 0;
+                            
+                                  setTimeout(() => {
+                                    showNotification(`"${matchValue}" is not a valid child part.`, 'error');
+                                    requestNotificationRefreshOnce(); // gentler than refreshNotifications()
+                                    hot.render(); // show red ! icon
+                                  }, 10);
+                                  return;
                                 }
+                            
+                                if (isDuplicate) {
+                                  console.warn(`⚠️ Type→Child Part but "${matchValue}" is duplicate - notifying`);
+                                  setTimeout(() => {
+                                    showNotification(`"${matchValue}" is already used in another Child Part row.`, 'error');
+                                    requestNotificationRefreshOnce();
+                                    hot.render();
+                                  }, 10);
+                                  return;
+                                }
+                            
+                                // ✅ Valid + not duplicate → compute similarity (if PartNumber OCR exists)
+                                const partCell = rowData["PartNumber"];
+                                const partText = partCell?.text || "";
+                                if (partText) {
+                                  const sim = sequentialCharacterMatch(partText, matchValue);
+                                  spreadsheetData[row]["_similarityScore"] = sim;
+                                }
+                              }
+                            
+                              requestNotificationRefreshOnce();
                             }
 
+                        
                             refreshNotifications();
                         }
 
                         // Optional logging for Type edits
-                        if (prop === 'Type') {
-                            console.log(`🔄 Type changed to: "${newVal}" for row ${row}`);
-                        }
-                    });
-                    hasWarningNotificationShown = false;            
-                    hot.render();
-
-                    refreshNotifications(); // Always check current state after user action
-                }
-            });
-        }
-
+                                                if (prop === 'Type') {
+                                                    console.log(`🔄 Type changed to: "${newVal}" for row ${row}`);
+                                                }
+                                            });  // ← Close changes.forEach
+                                        }        // ← Close if (source === 'edit')
+                                    });          // ← Close hot.addHook('afterChange')
+                                }  // ← Close renderSpreadsheet function
         // ─────────────────────────────────────────────────────────────────────
         // addColumn: used by OCR processing to inject a new column's OCR data
         // ─────────────────────────────────────────────────────────────────────
         function addColumn(newColumnData, label) {
-            console.log(`🔧 addColumn called with label: "${label}"`);
+            console.log(`🔧 addColumn called with label: "${label}", Append Mode: ${isAppendMode}`);
+            
             /* --------------------------------------------------------------------
-               If the user re‑uploads the PartNumber column we must clear any
-               previous auto‑matching results so they don’t linger and confuse.
+               If the user re-uploads the PartNumber column we must clear any
+               previous auto-matching results so they don't linger and confuse.
             -------------------------------------------------------------------- */
-            if (label === 'PartNumber') {
+            if (label === 'PartNumber' && !isAppendMode) {
                 spreadsheetData.forEach(r => {
                     r['Matched Childpart'] = '';
                     r['Type'] = '';
@@ -2273,70 +2641,105 @@ function isDuplicateChildpartSelection(value, rowIndex) {
                 });
             }
             console.log(`📊 Data received:`, newColumnData);
-
-            // Now update spreadsheetData for this column without reordering others
+        
+            // ✅ NEW: Determine starting row index
+            let startRow = 0;
+            
+            if (isAppendMode) {
+                // Find last non-empty row for this column
+                for (let i = spreadsheetData.length - 1; i >= 0; i--) {
+                    const cellData = spreadsheetData[i]?.[label];
+                    if (cellData && cellData.text && cellData.text.trim() !== "") {
+                        startRow = i + 1; // Start after last filled row
+                        break;
+                    }
+                }
+                console.log(`📌 Append mode: Starting at row ${startRow}`);
+            } else {
+                console.log(`🔄 Replace mode: Starting at row 0`);
+                // Clear existing data for this column only
+                spreadsheetData.forEach(row => {
+                    if (row[label]) {
+                        row[label] = { text: "", confidence: 0, ocr: false };
+                    }
+                });
+            }
+        
+            // Now update spreadsheetData for this column
             for (let i = 0; i < newColumnData.length; i++) {
+                const targetRow = startRow + i;
                 const text = newColumnData[i]?.text || "";
                 const confidence = newColumnData[i]?.confidence || 0;
-
+        
                 // Ensure row exists
-                if (!spreadsheetData[i]) {
-                    spreadsheetData[i] = {};
+                while (spreadsheetData.length <= targetRow) {
+                    spreadsheetData.push({
+                        "PartNumber": { text: "", confidence: 0 },
+                        "Type": "",
+                        "Matched Childpart": "",
+                        Quantity: { text: "", confidence: 0 },
+                        Description: { text: "", confidence: 0 },
+                        Material: { text: "", confidence: 0 },
+                    });
                 }
-
+        
                 // Store OCR data
-                spreadsheetData[i][label] = { text, confidence, ocr: true };
-                console.log(`📝 Row ${i}: Set ${label} = "${text}" (confidence: ${confidence})`);
-
+                spreadsheetData[targetRow][label] = { text, confidence, ocr: true };
+                console.log(`📝 Row ${targetRow}: Set ${label} = "${text}" (confidence: ${confidence})`);
+        
                 // CRITICAL: PartNumber matching logic
                 if (label === "PartNumber" && text.trim() !== "") {
-                    console.log(`🔍 Processing PartNumber matching for row ${i}: "${text}"`);
+                    console.log(`🔎 Processing PartNumber matching for row ${targetRow}: "${text}"`);
                     console.log(`🎯 Available drawings:`, windowChildParts);
-
+        
                     if (windowChildParts && windowChildParts.length > 0) {
                         const best = findBestSequentialMatch(text, windowChildParts);
                         console.log(`🎖️ Best match result:`, best);
-
+        
                         const matchText = best.bestMatch.rating > 0.85 ? best.bestMatch.target : "";
                         console.log(`✨ Match selected (rating ${best.bestMatch.rating}): "${matchText}"`);
-
+        
                         // Only auto-populate if not manually set
-                        const currentMatch = spreadsheetData[i]["Matched Childpart"];
+                        const currentMatch = spreadsheetData[targetRow]["Matched Childpart"];
                         if (!currentMatch || currentMatch === "") {
                             if (matchText) {
                                 // ✅ GOOD MATCH: Child Part
-                                spreadsheetData[i]["Matched Childpart"] = matchText;
-                                spreadsheetData[i]["Type"] = "Child Part";
+                                spreadsheetData[targetRow]["Matched Childpart"] = matchText;
+                                spreadsheetData[targetRow]["Type"] = "Child Part";
                                 console.log(`✅ Auto-populated Matched Childpart: "${matchText}"`);
                             } else {
                                 // ❌ NO MATCH: Potential BO with warning
-                                spreadsheetData[i]["Matched Childpart"] = text; // Use original PartNumber text
-                                spreadsheetData[i]["Type"] = "";
-                                spreadsheetData[i]["_missingDrawing"] = true; // Flag for warning icon
+                                spreadsheetData[targetRow]["Matched Childpart"] = text;
+                                spreadsheetData[targetRow]["Type"] = "";
+                                spreadsheetData[targetRow]["_missingDrawing"] = true;
                                 console.log(`❌ No matching drawing found - missing drawing error: "${text}"`);
                             }
                         } else {
-                            console.log(`⏭️ Skipped auto-population - already set to: "${currentMatch}"`);
+                            console.log(`⭕ Skipped auto-population - already set to: "${currentMatch}"`);
                         }
-
+        
                         // Store similarity score for reference
-                        spreadsheetData[i]["_similarityScore"] = best.bestMatch.rating;
+                        spreadsheetData[targetRow]["_similarityScore"] = best.bestMatch.rating;
                     } else {
                         console.warn("⚠️ No drawing numbers available for matching");
                     }
                 }
             }
-
-            // Instead of always calling renderSpreadsheet, update data if hot exists
+        
+            // ✅ CRITICAL FIX: Force immediate render to avoid "click to show" bug
             if (hot) {
                 hot.loadData(spreadsheetData);
+                // Force render to ensure all rows are visible immediately
+                setTimeout(() => {
+                    hot.render();
+                    console.log("✅ Forced render after data load");
+                }, 50);
             } else {
                 renderSpreadsheet();
             }
-
+        
             refreshNotifications(); // ← Check for warnings after OCR processing
         }
-
         // ─────────────────────────────────────────────────────────────────────
         // OCR Uploads: Multiple zones, event delegation, state per column
         // ─────────────────────────────────────────────────────────────────────
@@ -2447,61 +2850,66 @@ function isDuplicateChildpartSelection(value, rowIndex) {
             document.getElementById("ocr-process-btn").disabled = Object.keys(fileStates).length === 0;
         }
 
-        // ─────────────────────────────────────────────────────────────────────
+        // ────────────────────────────────────────────────────────────────
         // CRITICAL: OCR Processing with correct column mapping
-        // ─────────────────────────────────────────────────────────────────────
+        // ────────────────────────────────────────────────────────────────
         document.getElementById("ocr-process-btn").addEventListener("click", async () => {
             const processBtn = document.getElementById("ocr-process-btn");
             const originalText = processBtn.textContent;
             processBtn.disabled = true;
             processBtn.textContent = "Processing...";
-
-            console.log("🚀 Starting OCR processing...");
-            console.log("📁 Files to process:", Object.keys(fileStates));
-
-            // Map upload labels to internal column names
+        
+            console.log("Starting OCR processing...");
+            console.log("Files to process:", Object.keys(fileStates));
+        
             const columnKeyMap = {
-                "Part Number": "PartNumber", // Maps to hidden PartNumber column
+                "Part Number": "PartNumber",
                 "Quantity": "Quantity",
                 "Description": "Description",
                 "Material": "Material",
             };
-
+        
             for (const label in fileStates) {
-                const internalColumn = columnKeyMap[label];
-
-                // Add this safety check:
+                const internalColumn = columnKeyMap[label] || label;
+        
                 if (!internalColumn) {
-                    console.warn(`⚠️ No mapping found for upload label: ${label}`);
+                    console.warn("No mapping found for upload label:", label);
                     continue;
                 }
-
-                console.log(`🔄 Processing ${label} → ${internalColumn}`);
-
+        
+                console.log("Processing", label, "->", internalColumn);
+        
                 const formData = new FormData();
                 formData.append("image", fileStates[label]);
-                formData.append("mode", "table");
                 formData.append("column", internalColumn);
-
+                formData.append("mode", "table");
+        
                 try {
-                    const resp = await fetch("https://dev-ocr-table-extractor.onrender.com", {
+                    console.log("Calling main endpoint for", label);
+                    
+                    const response = await fetch("https://ocr-gemini-test.onrender.com/", {
                         method: "POST",
                         body: formData,
                     });
-                    const data = await resp.json();
-
-                    console.log(`✅ OCR response for ${label}:`, data);
-
-                    if (data.table && Array.isArray(data.table)) {
-                        addColumn(data.table, internalColumn);
+        
+                    if (response.ok) {
+                        const data = await response.json();
+                        const engine = data.engine || "unknown";
+                        console.log(engine.toUpperCase(), "extracted data for", label, ":", data);
+        
+                        if (data.table && Array.isArray(data.table)) {
+                            addColumn(data.table, internalColumn);
+                        } else {
+                            console.error("Invalid response format for", label);
+                        }
                     } else {
-                        console.warn(`⚠️ No table data in response for ${label}`);
+                        console.error("Backend returned error", response.status, "for", label);
                     }
-                } catch (err) {
-                    console.error(`❌ OCR error for ${label}:`, err);
+                } catch (error) {
+                    console.error("Request failed for", label, ":", error);
                 }
             }
-
+        
             // Clear preview and fileStates after processing
             uploads.forEach(area => {
                 area.querySelector(".file-status").style.display = "none";
@@ -2509,30 +2917,24 @@ function isDuplicateChildpartSelection(value, rowIndex) {
                 area.querySelector("input").value = "";
                 area.classList.remove("has-file");
             });
-
+        
             Object.keys(fileStates).forEach(k => delete fileStates[k]);
             processBtn.disabled = true;
-            processBtn.textContent = originalText; // Restore original text
-
-            // Auto-close OCR panel
+            processBtn.textContent = originalText;
+        
             const panel = document.getElementById("ocr-panel");
             panel.classList.remove("open");
-
-            console.log("🏁 OCR processing completed");
+            
+            // ✅ Force final render to ensure all new data is visible
+            if (hot) {
+                setTimeout(() => {
+                    hot.render();
+                    console.log("✅ Final render after all OCR processing");
+                }, 100);
+            }
+            
+            console.log("OCR processing completed");
         });
-
-        // ─────────────────────────────────────────────────────────────────────
-        // OCR Panel Toggle: Extract button opens, Close (X) closes
-        // ─────────────────────────────────────────────────────────────────────
-        document.getElementById("extract-btn").addEventListener("click", () => {
-            const panel = document.getElementById("ocr-panel");
-            panel.classList.add("open");
-        });
-        document.getElementById("ocr-close-btn").addEventListener("click", () => {
-            const panel = document.getElementById("ocr-panel");
-            panel.classList.remove("open");
-        });
-
         // ─────────────────────────────────────────────────────────────────────
         // Show/Hide help popover
         // ─────────────────────────────────────────────────────────────────────
@@ -2544,10 +2946,10 @@ function isDuplicateChildpartSelection(value, rowIndex) {
             if (!e.target.closest("#help-icon")) {
                 document.getElementById("help-popover").style.display = "none";
                 // Only hide instructions, not error/success notifications
-                const area = document.getElementById('notification-area');
-                if (area.className === 'notification-instructions') {
-                    hideNotification();
-                }
+       //         const area = document.getElementById('notification-area');
+         //       if (area.className === 'notification-instructions') {
+           //         hideNotification();
+             //   }
             }
         });
 
@@ -2557,7 +2959,6 @@ function isDuplicateChildpartSelection(value, rowIndex) {
         document.getElementById("submit-btn").addEventListener("click", () => {
             sendDataToBackend();
         });
-
 
         // Add this after your table initialization
         document.addEventListener('click', function (e) {
@@ -2647,12 +3048,176 @@ function isDuplicateChildpartSelection(value, rowIndex) {
         function hideNotification() {
             document.getElementById('notification-area').className = 'notification-hidden';
         }
+// --- Default instructions text (single source of truth) ---
+const DEFAULT_INSTRUCTIONS = 'Type or Upload Column screenshots (≤10 rows) in header';
+
+// Show the default instructions banner (no auto-hide)
+function showDefaultInstructions() {
+  showNotification(DEFAULT_INSTRUCTIONS, 'instructions', 0);
+}
+
+// Helper: is any banner currently visible?
+function isBannerVisible() {
+  const area = document.getElementById('notification-area');
+  return area && !area.classList.contains('notification-hidden');
+}
+// ——— Hover-to-modal when instructions banner is visible ———
+// timings
+const INSTR_HOVER_OPEN_DELAY_MS = 300;   // wait this long before opening
+const INSTR_AUTOCLOSE_MS        = 15000; // auto-close after this long
+
+let instrHoverOpenTimer = null;  // delay timer for opening
+let instrAutoCloseTimer = null;  // auto-close timer
+let instrIsOpen = false;         // modal currently open?
+let instrHoverArmed = false;     // a hover session is active
+let instrManualClose = false;    // user closed during current hover session
+// focus management for the instructions modal
+let instrPrevFocus = null;
+let instrKeyHandler = null;
+
+function ensureInstrModalContent() {
+  const body = document.getElementById('instr-modal-body');
+  if (!body) return;
+  if (body.childElementCount === 0) {
+    const tpl = document.getElementById('instr-modal-default');
+    if (tpl && tpl.content) body.appendChild(tpl.content.cloneNode(true));
+  }
+}
+
+function openInstrModal() {
+  if (instrIsOpen || (instrHoverArmed && instrManualClose)) return;
+
+  ensureInstrModalContent();
+  const backdrop = document.getElementById('instr-modal-backdrop');
+  const closeBtn = document.getElementById('instr-modal-close');
+
+  if (!backdrop) return;
+
+  // ✅ Set aria-hidden FIRST, then display
+  backdrop.setAttribute('aria-hidden', 'false');
+  backdrop.style.display = 'block';
+  instrIsOpen = true;
+
+  // remember prior focus and move focus into the dialog
+  instrPrevFocus = document.activeElement;
+  setTimeout(() => closeBtn?.focus(), 0);
+
+  // optional: prevent background scroll while open
+  document.body.style.overflow = 'hidden';
+
+  // Escape & simple focus trap
+  instrKeyHandler = (e) => {
+    if (e.key === 'Escape') {
+      closeInstrModal(true);
+      return;
+    }
+    if (e.key === 'Tab') {
+      const card = document.getElementById('instr-modal-card');
+      if (!card) return;
+      const focusables = card.querySelectorAll(
+        'a,button,input,select,textarea,[tabindex]:not([tabindex="-1"])'
+      );
+      if (!focusables.length) return;
+      const first = focusables[0];
+      const last  = focusables[focusables.length - 1];
+
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault(); last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault(); first.focus();
+      }
+    }
+  };
+  document.addEventListener('keydown', instrKeyHandler);
+
+  clearTimeout(instrAutoCloseTimer);
+  instrAutoCloseTimer = setTimeout(() => closeInstrModal(false), INSTR_AUTOCLOSE_MS);
+}
+
+function closeInstrModal(manual = false) {
+  const backdrop = document.getElementById('instr-modal-backdrop');
+  if (!backdrop) return;
+
+  // ✅ Set display=none first, then aria-hidden (optional - redundant when hidden)
+  backdrop.style.display = 'none';
+  // backdrop.setAttribute('aria-hidden', 'true'); // ← Optional: remove this line
+  instrIsOpen = false;
+
+  // restore background scroll
+  document.body.style.overflow = '';
+
+  // return focus to the opener for good a11y
+  document.getElementById('header-help-icon')?.focus?.();
+
+  if (manual) instrManualClose = true;
+
+  clearTimeout(instrAutoCloseTimer);
+
+  if (instrKeyHandler) {
+    document.removeEventListener('keydown', instrKeyHandler);
+    instrKeyHandler = null;
+  }
+}
+
+
+
+function onInstrEnter() {
+  const area = document.getElementById('notification-area');
+  if (!area) return;
+  if (!area.classList.contains('notification-instructions')) return;
+
+  if (instrHoverArmed) return;      // already in a hover session
+  instrHoverArmed = true;
+  instrManualClose = false;         // reset for this session
+
+  // start delayed open
+  clearTimeout(instrHoverOpenTimer);
+  instrHoverOpenTimer = setTimeout(() => {
+    openInstrModal();
+  }, INSTR_HOVER_OPEN_DELAY_MS);
+}
+
+function onInstrLeave() {
+  // user left before delay elapsed → cancel open
+  clearTimeout(instrHoverOpenTimer);
+
+  // DO NOT close the modal on mouse leave.
+  // It will close either by the 10s timer or by the user pressing ✕.
+  // End the hover session; next enter can re-arm.
+  instrHoverArmed = false;
+  instrManualClose = false;
+}
+
+function attachInstructionHover() {
+  const area = document.getElementById('notification-area');
+  if (!area) return;
+
+  area.removeEventListener('mouseenter', onInstrEnter);
+  area.removeEventListener('mouseleave', onInstrLeave);
+  area.addEventListener('mouseenter', onInstrEnter);
+  area.addEventListener('mouseleave', onInstrLeave);
+}
+
+// Close button + click-outside
+document.addEventListener('DOMContentLoaded', () => {
+  const closeBtn = document.getElementById('instr-modal-close');
+  const backdrop = document.getElementById('instr-modal-backdrop');
+  if (closeBtn) closeBtn.addEventListener('click', () => closeInstrModal(true));
+  if (backdrop) {
+    backdrop.addEventListener('click', (e) => {
+      if (e.target.id === 'instr-modal-backdrop') closeInstrModal(true);
+    });
+  }
+  attachInstructionHover();
+});
+
+
 
         // Toggle instructions (just calls showNotification)
         function toggleInstructions() {
             const area = document.getElementById('notification-area');
             if (area.className === 'notification-instructions') {
-                clearNotification();
+                hideNotification(); 
             } else {
                 showNotification('Type or Upload Column screenshots (≤10 rows) in header', 'instructions', 0);
             }
@@ -2661,23 +3226,16 @@ function isDuplicateChildpartSelection(value, rowIndex) {
 
         // Help button
         document.getElementById("header-help-icon").addEventListener("click", (e) => {
-            e.stopPropagation();
-            toggleInstructions();
-
-            // Toggle popover
-            const popover = document.getElementById("header-help-popover");
-            popover.style.display = popover.style.display === "block" ? "none" : "block";
+          e.stopPropagation();
+          toggleInstructions();
         });
-
-        // Close button handles everything
+        
         document.getElementById('notification-close').addEventListener('click', function (e) {
-            e.preventDefault();
-            e.stopPropagation();
-            hideNotification();
-
-            // Also close popover if it was instructions
-            document.getElementById("header-help-popover").style.display = "none";
+          e.preventDefault();
+          e.stopPropagation();
+          hideNotification();
         });
+
 
 
         // Complete refreshNotifications function - handles all error/warning types
@@ -2745,14 +3303,15 @@ function isDuplicateChildpartSelection(value, rowIndex) {
                 
                 console.log(`📢 Notification shown: ${highestPriorityNotification.message} (Priority ${highestPriorityNotification.priority})`);
             } else {
-                console.log(`✅ No errors found - notifications cleared`);
-                // Optionally hide notification if no errors found
-                const area = document.getElementById('notification-area');
-                    if (area && area.classList.contains('notification-success')) {
-                      return; // let showNotification's own success timer hide it
-                    }
-                    hideNotification();
-            }
+  console.log(`✅ No errors found`);
+  const area = document.getElementById('notification-area');
+
+  // If a SUCCESS is showing, leave it (it will auto-hide)
+  if (area && area.classList.contains('notification-success')) return;
+
+  // Otherwise keep our default instructions visible
+  showDefaultInstructions();
+}
         }
 
         function validateRequiredFields() {
@@ -3015,6 +3574,23 @@ function isDuplicateChildpartSelection(value, rowIndex) {
 
         // --- Ensure OCR upload header areas use correct data-column attributes (internal keys) ---
         // This runs once on DOMContentLoaded to fix any "data-column" attributes for header upload areas
+        // ========== APPEND MODE TOGGLE ==========
+        document.getElementById("append-mode-btn").addEventListener("click", () => {
+            const btn = document.getElementById("append-mode-btn");
+            isAppendMode = !isAppendMode;
+            
+            if (isAppendMode) {
+                btn.classList.remove("append-mode-off");
+                btn.classList.add("append-mode-on");
+                console.log("✅ Append mode: ENABLED");
+                showNotification("Append Mode ON", 'success', 1000);
+            } else {
+                btn.classList.remove("append-mode-on");
+                btn.classList.add("append-mode-off");
+                console.log("❌ Append mode: DISABLED");
+                showNotification("Append Mode OFF", 'success', 1000);
+            }
+        });
         document.addEventListener("DOMContentLoaded", function () {
             // Map display titles to internal keys
             const columnKeyMap = {
@@ -3038,6 +3614,22 @@ function isDuplicateChildpartSelection(value, rowIndex) {
         lucide.createIcons();
 
     </script>
+<!-- Default content template (easy to replace later) -->
+<template id="instr-modal-default">
+  <figure style="margin:0">
+    <img src="sample-screenshot.png" alt="Good vs Bad screenshot guide" />
+    <!-- You can add captions, bullets, or more elements here later -->
+    <!-- <figcaption style="color:#aaa;margin-top:8px">Tips for best results...</figcaption> -->
+  </figure>
+</template>
+
+<!-- Reusable modal with a content slot -->
+<div id="instr-modal-backdrop">
+  <div id="instr-modal-card" role="dialog" aria-modal="true" aria-labelledby="instr-modal-title">
+    <button id="instr-modal-close" aria-label="Close">×</button>
+    <div id="instr-modal-body"></div>
+  </div>
+</div>
 
 </body>
 
