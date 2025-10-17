@@ -3458,7 +3458,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (childPartsData.length) {
                     total++;
                     const respChild = await fetch(
-                        "https://dev-ocr-table-extractor.onrender.com/add-child-parts",
+                        "https://ocr-gemini-test.onrender.com/add-child-parts", 
+                        // "https://dev-ocr-table-extractor.onrender.com/add-child-parts", (have to change the render server link)
                         {
                             method: "POST",
                             headers: { "Content-Type": "application/json" },
@@ -3499,7 +3500,8 @@ document.addEventListener('DOMContentLoaded', () => {
                         const pdfPromises = missingChildpartRows.map(async (matchedPart) => {
                             try {
                                 const pdfResp = await fetch(
-                                    `https://dev-ocr-table-extractor.onrender.com/generate-missing-childpart-pdf?project=${project}&part=${partNumber}`,
+                                    `https://ocr-gemini-test.onrender.com/generate-missing-childpart-pdf?project=${project}&part=${partNumber}`,
+                                    // `https://dev-ocr-table-extractor.onrender.com/generate-missing-childpart-pdf?project=${project}&part=${partNumber}`,
                                     {
                                         method: "POST",
                                         headers: { "Content-Type": "application/json" },
@@ -3535,7 +3537,9 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (boData.length) {
                     total++;
                     const respBo = await fetch(
-                        "https://dev-ocr-table-extractor.onrender.com/add-bo-parts",
+                        "https://ocr-gemini-test.onrender.com/add-bo-parts",
+                        // "https://dev-ocr-table-extractor.onrender.com/add-bo-parts",
+                        
                         {
                             method: "POST",
                             headers: { "Content-Type": "application/json" },
