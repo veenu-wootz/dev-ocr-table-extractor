@@ -3327,45 +3327,68 @@ document.addEventListener('DOMContentLoaded', () => {
 }
         }
 
-        function validateRequiredFields() {
-            const missingColumns = new Set();
-            const invalidColumns = new Set();
-            let hasValidRow = false;
+      function validateRequiredFields() {
+  const missingColumns = new Set();
+  const invalidColumns = new Set();
+  let hasValidRow = false;
 
-            spreadsheetData.forEach((row) => {
-                const type = row.Type?.trim();
-                const qty = row.Quantity?.text?.trim();
-                const table_partNumber = row["Matched Childpart"]?.trim();
+  const hasChildList = Array.isArray(windowChildParts) && windowChildParts.length > 0;
+  const missingChildLabel = TYPE_DISPLAY_NAMES["Missing Childpart"]; // "Missing Drawing" label
 
-                // Skip empty rows (no Type, Quantity, and PartNumber)
-                if (!type && !qty && !table_partNumber) return;
+  spreadsheetData.forEach((row, idx) => {
+    const type = row.Type?.trim();
+    const qty = row.Quantity?.text?.trim();
+    const table_partNumber = (row["Matched Childpart"] || "").toString().trim();
 
-                hasValidRow = true;
+    // Skip empty rows (no Type, Quantity, and PartNumber)
+    if (!type && !qty && !table_partNumber) return;
 
-                // Collect missing fields
-                if (!type) missingColumns.add("Type");
-                if (!table_partNumber) missingColumns.add("Part Number");
-                if (!qty) missingColumns.add("Quantity");
+    hasValidRow = true;
 
-                // Collect invalid fields
-                if (row.Quantity?.text && !/^\d+$/.test(row.Quantity.text.trim())) {
-                    invalidColumns.add("Quantity");
-                }
-            });
+    // Collect missing fields
+    if (!type) missingColumns.add("Type");
+    if (!table_partNumber) missingColumns.add("Part Number");
+    if (!qty) missingColumns.add("Quantity");
 
-            const messages = [];
-            if (missingColumns.size > 0) {
-                messages.push(`(${Array.from(missingColumns).join(", ")})`);
-            }
-            if (invalidColumns.size > 0) {
-                messages.push(`Invalid Data (${Array.from(invalidColumns).join(", ")})`);
-            }
+    // Collect invalid fields
+    if (row.Quantity?.text && !/^\d+$/.test(row.Quantity.text.trim())) {
+      invalidColumns.add("Quantity");
+    }
 
-            return {
-                isValid: hasValidRow && messages.length === 0,
-                missingFields: messages
-            };
-        }
+    // ✅ BLOCK SUBMIT: UI already flagged "Part Number Not Found"
+    // (this is the exact case you showed)
+    if (row._missingDrawing) {
+      invalidColumns.add("Part Number");
+    }
+
+    // ✅ Extra safety: if Type is Child Part and we have the list, ensure part is valid
+    // (covers cases where validator didn't run / flag not set)
+    if (type === "Child Part" && table_partNumber && hasChildList) {
+      if (!windowChildParts.includes(table_partNumber)) {
+        invalidColumns.add("Part Number");
+      }
+    }
+
+    // Optional strictness: if list not loaded, don't allow Child Part submit
+    // uncomment if you want HARD BLOCK until list loads
+    // if (type === "Child Part" && table_partNumber && !hasChildList) {
+    //   invalidColumns.add("Part Number");
+    // }
+  });
+
+  const messages = [];
+  if (missingColumns.size > 0) {
+    messages.push(`(${Array.from(missingColumns).join(", ")})`);
+  }
+  if (invalidColumns.size > 0) {
+    messages.push(`Invalid Data (${Array.from(invalidColumns).join(", ")})`);
+  }
+
+  return {
+    isValid: hasValidRow && messages.length === 0,
+    missingFields: messages
+  };
+}
 
         function clearTableToDefault() {
             hot.clear(); // ✅ Built-in method that safely clears all data
