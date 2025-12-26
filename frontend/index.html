@@ -1364,6 +1364,19 @@
             "Missing Childpart": "Missing Drawing"
         };
 
+        // =========================
+// API / Render endpoints (single source of truth)
+// =========================
+const API_BASE = "https://dev-ocr-table-extractor.onrender.com";
+
+const ENDPOINTS = {
+  fetchDrawings: `${API_BASE}/fetch-drawings`,
+  ocr: `${API_BASE}/`, // keep trailing slash if your backend expects it
+  addChildParts: `${API_BASE}/add-child-parts`,
+  addBoParts: `${API_BASE}/add-bo-parts`,
+  generateMissingChildpartPdf: `${API_BASE}/generate-missing-childpart-pdf`,
+};
+
 let spreadsheetData = [];
 let columnsList = [];
 let hot;
@@ -1434,7 +1447,7 @@ function isDuplicateChildpartSelection(value, rowIndex) {
                 try {
                     console.log("📡 Fetching child parts from backend...");
                     const resp = await fetch(
-                        "https://ocr-gemini-test.onrender.com/fetch-drawings",
+                          ENDPOINTS.fetchDrawings,
                         {
                             method: "POST",
                             headers: { "Content-Type": "application/json" },
@@ -2887,7 +2900,7 @@ showDefaultInstructions();
                 try {
                     console.log("Calling main endpoint for", label);
                     
-                    const response = await fetch("https://ocr-gemini-test.onrender.com/", {
+                    const response = await fetch(ENDPOINTS.ocr, {
                         method: "POST",
                         body: formData,
                     });
@@ -3458,7 +3471,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (childPartsData.length) {
                     total++;
                     const respChild = await fetch(
-                        "https://dev-ocr-table-extractor.onrender.com/add-child-parts",
+                          ENDPOINTS.addChildParts,
                         {
                             method: "POST",
                             headers: { "Content-Type": "application/json" },
@@ -3498,16 +3511,22 @@ document.addEventListener('DOMContentLoaded', () => {
                         // Generate PDF for each missing childpart
                         const pdfPromises = missingChildpartRows.map(async (matchedPart) => {
                             try {
-                                const pdfResp = await fetch(
-                                    `https://dev-ocr-table-extractor.onrender.com/generate-missing-childpart-pdf?project=${project}&part=${partNumber}`,
-                                    {
-                                        method: "POST",
-                                        headers: { "Content-Type": "application/json" },
-                                        body: JSON.stringify({
-                                            matchedPart: matchedPart
-                                        }),
-                                    }
-                                );
+                                const pdfUrl =
+  `${ENDPOINTS.generateMissingChildpartPdf}` +
+  `?project=${encodeURIComponent(project)}` +
+  `&part=${encodeURIComponent(partNumber)}`;
+
+const pdfResp = await fetch(
+  pdfUrl,
+  {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      matchedPart: matchedPart
+    }),
+  }
+);
+
                                 
                                 if (pdfResp.ok) {
                                     console.log(`✅ Missing childpart PDF generated successfully for: ${matchedPart}`);
@@ -3535,7 +3554,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (boData.length) {
                     total++;
                     const respBo = await fetch(
-                        "https://dev-ocr-table-extractor.onrender.com/add-bo-parts",
+                            ENDPOINTS.addBoParts,
                         {
                             method: "POST",
                             headers: { "Content-Type": "application/json" },
