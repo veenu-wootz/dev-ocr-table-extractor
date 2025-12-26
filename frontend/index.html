@@ -1364,6 +1364,19 @@
             "Missing Childpart": "Missing Drawing"
         };
 
+        // =========================
+// API / Render endpoints (single source of truth)
+// =========================
+const API_BASE = "https://dev-ocr-table-extractor.onrender.com";
+
+const ENDPOINTS = {
+  fetchDrawings: `${API_BASE}/fetch-drawings`,
+  ocr: `${API_BASE}/`, // keep trailing slash if your backend expects it
+  addChildParts: `${API_BASE}/add-child-parts`,
+  addBoParts: `${API_BASE}/add-bo-parts`,
+  generateMissingChildpartPdf: `${API_BASE}/generate-missing-childpart-pdf`,
+};
+
 let spreadsheetData = [];
 let columnsList = [];
 let hot;
@@ -1434,7 +1447,7 @@ function isDuplicateChildpartSelection(value, rowIndex) {
                 try {
                     console.log("📡 Fetching child parts from backend...");
                     const resp = await fetch(
-                        "https://ocr-gemini-test.onrender.com/fetch-drawings",
+                          ENDPOINTS.fetchDrawings,
                         {
                             method: "POST",
                             headers: { "Content-Type": "application/json" },
@@ -2887,7 +2900,7 @@ showDefaultInstructions();
                 try {
                     console.log("Calling main endpoint for", label);
                     
-                    const response = await fetch("https://ocr-gemini-test.onrender.com/", {
+                    const response = await fetch(ENDPOINTS.ocr, {
                         method: "POST",
                         body: formData,
                     });
@@ -3314,45 +3327,68 @@ document.addEventListener('DOMContentLoaded', () => {
 }
         }
 
-        function validateRequiredFields() {
-            const missingColumns = new Set();
-            const invalidColumns = new Set();
-            let hasValidRow = false;
+      function validateRequiredFields() {
+  const missingColumns = new Set();
+  const invalidColumns = new Set();
+  let hasValidRow = false;
 
-            spreadsheetData.forEach((row) => {
-                const type = row.Type?.trim();
-                const qty = row.Quantity?.text?.trim();
-                const table_partNumber = row["Matched Childpart"]?.trim();
+//  const hasChildList = Array.isArray(windowChildParts) && windowChildParts.length > 0;
+//  const missingChildLabel = TYPE_DISPLAY_NAMES["Missing Childpart"]; // "Missing Drawing" label
 
-                // Skip empty rows (no Type, Quantity, and PartNumber)
-                if (!type && !qty && !table_partNumber) return;
+  spreadsheetData.forEach((row, idx) => {
+    const type = row.Type?.trim();
+    const qty = row.Quantity?.text?.trim();
+    const table_partNumber = (row["Matched Childpart"] || "").toString().trim();
 
-                hasValidRow = true;
+    // Skip empty rows (no Type, Quantity, and PartNumber)
+    if (!type && !qty && !table_partNumber) return;
 
-                // Collect missing fields
-                if (!type) missingColumns.add("Type");
-                if (!table_partNumber) missingColumns.add("Part Number");
-                if (!qty) missingColumns.add("Quantity");
+    hasValidRow = true;
 
-                // Collect invalid fields
-                if (row.Quantity?.text && !/^\d+$/.test(row.Quantity.text.trim())) {
-                    invalidColumns.add("Quantity");
-                }
-            });
+    // Collect missing fields
+    if (!type) missingColumns.add("Type");
+    if (!table_partNumber) missingColumns.add("Part Number");
+    if (!qty) missingColumns.add("Quantity");
 
-            const messages = [];
-            if (missingColumns.size > 0) {
-                messages.push(`(${Array.from(missingColumns).join(", ")})`);
-            }
-            if (invalidColumns.size > 0) {
-                messages.push(`Invalid Data (${Array.from(invalidColumns).join(", ")})`);
-            }
+    // Collect invalid fields
+    if (row.Quantity?.text && !/^\d+$/.test(row.Quantity.text.trim())) {
+      invalidColumns.add("Quantity");
+    }
 
-            return {
-                isValid: hasValidRow && messages.length === 0,
-                missingFields: messages
-            };
-        }
+    // ✅ BLOCK SUBMIT: UI already flagged "Part Number Not Found"
+    // (this is the exact case you showed)
+    if (row._missingDrawing) {
+      invalidColumns.add("Part Number");
+    }
+
+    // ✅ Extra safety: if Type is Child Part and we have the list, ensure part is valid
+    // (covers cases where validator didn't run / flag not set)
+    // if (type === "Child Part" && table_partNumber && hasChildList) {
+    //   if (!windowChildParts.includes(table_partNumber)) {
+    //     invalidColumns.add("Part Number");
+    //   }
+    // }
+
+    // Optional strictness: if list not loaded, don't allow Child Part submit
+    // uncomment if you want HARD BLOCK until list loads
+    // if (type === "Child Part" && table_partNumber && !hasChildList) {
+    //   invalidColumns.add("Part Number");
+    // }
+  });
+
+  const messages = [];
+  if (missingColumns.size > 0) {
+    messages.push(`(${Array.from(missingColumns).join(", ")})`);
+  }
+  if (invalidColumns.size > 0) {
+    messages.push(`Invalid Data (${Array.from(invalidColumns).join(", ")})`);
+  }
+
+  return {
+    isValid: hasValidRow && messages.length === 0,
+    missingFields: messages
+  };
+}
 
         function clearTableToDefault() {
             hot.clear(); // ✅ Built-in method that safely clears all data
@@ -3458,8 +3494,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (childPartsData.length) {
                     total++;
                     const respChild = await fetch(
-                        "https://ocr-gemini-test.onrender.com/add-child-parts", 
-                        // "https://dev-ocr-table-extractor.onrender.com/add-child-parts", (have to change the render server link)
+                          ENDPOINTS.addChildParts,
                         {
                             method: "POST",
                             headers: { "Content-Type": "application/json" },
@@ -3499,17 +3534,22 @@ document.addEventListener('DOMContentLoaded', () => {
                         // Generate PDF for each missing childpart
                         const pdfPromises = missingChildpartRows.map(async (matchedPart) => {
                             try {
-                                const pdfResp = await fetch(
-                                    `https://ocr-gemini-test.onrender.com/generate-missing-childpart-pdf?project=${project}&part=${partNumber}`,
-                                    // `https://dev-ocr-table-extractor.onrender.com/generate-missing-childpart-pdf?project=${project}&part=${partNumber}`,
-                                    {
-                                        method: "POST",
-                                        headers: { "Content-Type": "application/json" },
-                                        body: JSON.stringify({
-                                            matchedPart: matchedPart
-                                        }),
-                                    }
-                                );
+                                const pdfUrl =
+  `${ENDPOINTS.generateMissingChildpartPdf}` +
+  `?project=${encodeURIComponent(project)}` +
+  `&part=${encodeURIComponent(partNumber)}`;
+
+const pdfResp = await fetch(
+  pdfUrl,
+  {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      matchedPart: matchedPart
+    }),
+  }
+);
+
                                 
                                 if (pdfResp.ok) {
                                     console.log(`✅ Missing childpart PDF generated successfully for: ${matchedPart}`);
@@ -3537,9 +3577,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (boData.length) {
                     total++;
                     const respBo = await fetch(
-                        "https://ocr-gemini-test.onrender.com/add-bo-parts",
-                        // "https://dev-ocr-table-extractor.onrender.com/add-bo-parts",
-                        
+                            ENDPOINTS.addBoParts,
                         {
                             method: "POST",
                             headers: { "Content-Type": "application/json" },
