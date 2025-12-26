@@ -3314,45 +3314,50 @@ document.addEventListener('DOMContentLoaded', () => {
 }
         }
 
-        function validateRequiredFields() {
-            const missingColumns = new Set();
-            const invalidColumns = new Set();
-            let hasValidRow = false;
+function validateRequiredFields() {
+  const messages = [];
+  const allowedTypes = new Set(["Child Part", "BO", TYPE_DISPLAY_NAMES["Missing Childpart"]]);
 
-            spreadsheetData.forEach((row) => {
-                const type = row.Type?.trim();
-                const qty = row.Quantity?.text?.trim();
-                const table_partNumber = row["Matched Childpart"]?.trim();
+  let hasAnyRow = false;
+  let hasMissingDrawing = false;
 
-                // Skip empty rows (no Type, Quantity, and PartNumber)
-                if (!type && !qty && !table_partNumber) return;
+  for (let idx = 0; idx < spreadsheetData.length; idx++) {
+    const row = spreadsheetData[idx] || {};
+    const type = (row.Type || "").trim();
+    const qty = (row.Quantity?.text || "").trim();
+    const part = (row["Matched Childpart"] || "").toString().trim();
 
-                hasValidRow = true;
+    // skip fully empty rows
+    if (!type && !qty && !part) continue;
+    hasAnyRow = true;
 
-                // Collect missing fields
-                if (!type) missingColumns.add("Type");
-                if (!table_partNumber) missingColumns.add("Part Number");
-                if (!qty) missingColumns.add("Quantity");
+    // required fields
+    if (!type) messages.push(`Row ${idx + 1}: Missing Type`);
+    if (!part) messages.push(`Row ${idx + 1}: Missing Part Number`);
+    if (!qty) messages.push(`Row ${idx + 1}: Missing Quantity`);
 
-                // Collect invalid fields
-                if (row.Quantity?.text && !/^\d+$/.test(row.Quantity.text.trim())) {
-                    invalidColumns.add("Quantity");
-                }
-            });
+    // type validity
+    if (type && !allowedTypes.has(type)) {
+      messages.push(`Row ${idx + 1}: Invalid Type "${type}"`);
+    }
 
-            const messages = [];
-            if (missingColumns.size > 0) {
-                messages.push(`(${Array.from(missingColumns).join(", ")})`);
-            }
-            if (invalidColumns.size > 0) {
-                messages.push(`Invalid Data (${Array.from(invalidColumns).join(", ")})`);
-            }
+    // quantity validity
+    if (qty && !/^\d+$/.test(qty)) {
+      messages.push(`Row ${idx + 1}: Quantity must be an integer`);
+    }
 
-            return {
-                isValid: hasValidRow && messages.length === 0,
-                missingFields: messages
-            };
-        }
+    // ✅ the exact issue: UI flagged error but submit allowed
+    if (row._missingDrawing) {
+      hasMissingDrawing = true;
+      messages.push(`Row ${idx + 1}: Part Number Not Found`);
+    }
+  }
+
+  if (!hasAnyRow) messages.push("No data entered");
+
+  return { isValid: messages.length === 0, messages };
+}
+
 
         function clearTableToDefault() {
             hot.clear(); // ✅ Built-in method that safely clears all data
@@ -3381,16 +3386,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 addDataBtn.textContent = "Sending...";
                 // Validate required fields:
                 const validation = validateRequiredFields();
-                if (!validation.isValid) {
-                    showNotification(
-                        `Missing Data:\n${validation.missingFields.join(
-                            ", "
-                        )}`, 'error'
-                    );
-                    addDataBtn.disabled = false;
-                    addDataBtn.textContent = originalText;
-                    return;
-                }
+if (!validation.isValid) {
+  showNotification(validation.messages.join(" | "), "error");
+  addDataBtn.disabled = false;
+  addDataBtn.textContent = originalText;
+  return;
+}
+
 
                 const urlParams = new URLSearchParams(window.location.search);
                 const project = urlParams.get("project");
